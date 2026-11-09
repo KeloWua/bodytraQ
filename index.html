@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <title>BodyTrack</title>
+    <style>
+      body {
+        font-family: sans-serif;
+        margin: 2rem;
+      }
+      img {
+        max-width: 300px;
+        display: block;
+        margin-top: 0.5rem;
+      }
+      .foto {
+        margin-bottom: 2rem;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Registros</h1>
+    <div id="lista"></div>
+
+    <p id="info"></p>
+    <div id="fotos"></div>
+
+    <script>
+      const USER_ID = "e44c4858-b36e-48d6-ac85-a88f460e9e3d";
+      const VIEW_LABELS = { front: "Frente", back: "Espalda" };
+
+      async function cargarLista() {
+        const respuesta = await fetch("/api/users/" + USER_ID + "/entries");
+        const { data } = await respuesta.json();
+
+        const lista = document.getElementById("lista");
+        for (const registro of data) {
+          const boton = document.createElement("button");
+          boton.textContent = registro.date + " - " + registro.weightKg + " kg";
+          boton.addEventListener("click", () => {
+            cargarRegistro(registro.id).catch(() => {
+              document.getElementById("info").textContent =
+                "No se pudo cargar el registro";
+            });
+          });
+          lista.appendChild(boton);
+        }
+      }
+
+      async function cargarRegistro(id) {
+        const respuesta = await fetch("/api/entries/" + id);
+        const { data } = await respuesta.json();
+
+        document.getElementById("info").textContent =
+          data.date + " - " + data.weightKg + " kg - " + data.notes;
+
+        const contenedor = document.getElementById("fotos");
+        contenedor.replaceChildren();
+        for (const foto of data.photos) {
+          const bloque = document.createElement("div");
+          bloque.className = "foto";
+
+          const etiqueta = document.createElement("p");
+          etiqueta.textContent = VIEW_LABELS[foto.view] ?? foto.view;
+
+          const imagen = document.createElement("img");
+          imagen.src = "/api/photos/" + foto.id + "/file";
+          imagen.alt = VIEW_LABELS[foto.view] ?? foto.view;
+
+          bloque.appendChild(etiqueta);
+          bloque.appendChild(imagen);
+          contenedor.appendChild(bloque);
+        }
+      }
+
+      cargarLista().catch(() => {
+        document.getElementById("info").textContent =
+          "No se pudo cargar la lista";
+      });
+    </script>
+  </body>
+</html>
