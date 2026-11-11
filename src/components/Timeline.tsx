@@ -36,6 +36,7 @@ export default function Timeline({
   storageOk,
   onIndex,
   onAddPhoto,
+  onEditPhoto,
   onNewCheckIn,
   onEditCheckIn,
   onOpenSettings,
@@ -48,6 +49,7 @@ export default function Timeline({
   storageOk: boolean;
   onIndex: (i: number) => void;
   onAddPhoto: (viewId: string) => void;
+  onEditPhoto: (photo: Photo) => void;
   onNewCheckIn: () => void;
   onEditCheckIn: () => void;
   onOpenSettings: () => void;
@@ -267,6 +269,7 @@ export default function Timeline({
             <div key={v.id} className="bt-fade-in">
               <AlignedPhoto
                 srcUrl={url}
+                onClick={photo ? () => onEditPhoto(photo) : undefined}
                 transform={
                   photo
                     ? {
