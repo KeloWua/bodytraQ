@@ -336,14 +336,16 @@ export default function Page() {
             if (v) void openGuides(v);
           }}
           onImported={async () => {
-            if ((await protectionEnabled()) && !hasSession()) {
-              // La copia importada esta cifrada con otra o la misma contrasena:
-              // toca desbloquear para ver nada.
-              setProtection(true);
+            const prot = await protectionEnabled();
+            // Bloquear siempre tras importar: si la copia va cifrada hace
+            // falta su contrasena (puede ser otra); si ha quitado la
+            // proteccion, cualquier clave en memoria deja de aplicar.
+            lock();
+            setProtection(prot);
+            if (prot) {
               setLocked(true);
               return;
             }
-            setProtection(await protectionEnabled());
             await reload();
           }}
           onClose={() => setModal({ kind: "none" })}
