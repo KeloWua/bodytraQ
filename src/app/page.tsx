@@ -17,7 +17,7 @@ import db, {
 } from "@/lib/db";
 import { opfsSupported, storageEstimate, sweepOrphans, objectUrl, type Quota } from "@/lib/storage";
 import { processImageFile } from "@/lib/images";
-import { savePhoto } from "@/lib/photos";
+import { savePhoto, updatePhotoTransform } from "@/lib/photos";
 import { nowISO, uuid } from "@/lib/utils";
 import Timeline from "@/components/Timeline";
 import CheckInForm from "@/components/CheckInForm";
@@ -30,6 +30,7 @@ type Modal =
   | { kind: "checkin"; editing?: CheckIn }
   | { kind: "settings" }
   | { kind: "align"; checkInId: string; viewId: string; file: File }
+  | { kind: "realign"; photo: Photo }
   | { kind: "guides"; view: ViewProfile };
 
 export default function Page() {
@@ -42,6 +43,7 @@ export default function Page() {
   const [index, setIndex] = useState(0);
   const [modal, setModal] = useState<Modal>({ kind: "none" });
   const [refreshKey, setRefreshKey] = useState(0);
+  const [realign, setRealign] = useState<{ previewUrl: string } | null>(null);
   const [alignData, setAlignData] = useState<{
     previewUrl: string;
     display: Blob;
@@ -137,6 +139,30 @@ export default function Page() {
     await reload();
   }
 
+  // Reedicion de una foto ya subida: abre el mismo alineador con la
+  // transformacion guardada; al guardar solo se actualiza esa transformacion.
+  useEffect(() => {
+    if (modal.kind !== "realign") return;
+    let cancelled = false;
+    (async () => {
+      const url = await objectUrl(modal.photo.display_path);
+      if (cancelled || !url) return;
+      setRealign({ previewUrl: url });
+    })().catch(() => setModal({ kind: "none" }));
+    return () => {
+      cancelled = true;
+    };
+  }, [modal]);
+
+  async function handleSaveRealign(t: { scale: number; rotation: number; offset_x: number; offset_y: number }) {
+    if (modal.kind !== "realign" || !realign) return;
+    await updatePhotoTransform(modal.photo.id, t);
+    URL.revokeObjectURL(realign.previewUrl);
+    setRealign(null);
+    setModal({ kind: "none" });
+    await reload();
+  }
+
   async function openGuides(view: ViewProfile) {
     // Foto base: la mas reciente de esa vista, si existe.
     const rows = await db.photos
@@ -173,6 +199,7 @@ export default function Page() {
           pendingView.current = viewId;
           fileRef.current?.click();
         }}
+        onEditPhoto={(photo) => setModal({ kind: "realign", photo })}
         onNewCheckIn={() => setModal({ kind: "checkin" })}
         onEditCheckIn={() => current && setModal({ kind: "checkin", editing: current })}
         onOpenSettings={() => setModal({ kind: "settings" })}
@@ -266,6 +293,33 @@ export default function Page() {
             setModal({ kind: "none" });
           }}
         />
+      )}
+
+      {modal.kind === "realign" && realign && (
+        <PhotoAligner
+          previewSrc={realign.previewUrl}
+          baseWidth={modal.photo.width}
+          baseHeight={modal.photo.height}
+          initial={{
+            scale: modal.photo.scale,
+            rotation: modal.photo.rotation,
+            offset_x: modal.photo.offset_x,
+            offset_y: modal.photo.offset_y,
+          }}
+          guides={parseGuidesSafe(views.find((v) => v.id === modal.photo.view_profile_id)?.guides)}
+          onSave={handleSaveRealign}
+          onCancel={() => {
+            URL.revokeObjectURL(realign.previewUrl);
+            setRealign(null);
+            setModal({ kind: "none" });
+          }}
+        />
+      )}
+
+      {modal.kind === "realign" && !realign && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black text-neutral-400">
+          Cargando foto…
+        </div>
       )}
 
       {modal.kind === "align" && !alignData && (
