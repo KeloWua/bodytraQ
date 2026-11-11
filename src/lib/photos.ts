@@ -86,3 +86,12 @@ export async function deletePhoto(photo: Photo): Promise<void> {
   revokeUrl(photo.display_path);
   revokeUrl(photo.thumb_path);
 }
+
+// Actualiza solo la transformacion de una foto existente (reedicion de
+// alineacion): no toca archivos OPFS, guias ni la foto en si.
+export async function updatePhotoTransform(
+  id: string,
+  t: { scale: number; rotation: number; offset_x: number; offset_y: number },
+): Promise<void> {
+  await db.photos.update(id, { ...t, updated_at: nowISO() });
+}
