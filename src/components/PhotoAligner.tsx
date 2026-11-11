@@ -77,14 +77,16 @@ export default function PhotoAligner({
       const [a, b] = [...pointers.current.values()];
       const dist = Math.hypot(b.x - a.x, b.y - a.y);
       const angle = (Math.atan2(b.y - a.y, b.x - a.x) * 180) / Math.PI;
-      if (gesture.current.dist > 0) {
-        setScale((v) => clamp(v * (dist / gesture.current!.dist), 1, 5));
-      }
+      // Ratio y delta calculados en el evento: leer gesture.current dentro
+      // del updater funcional es una carrera (React lo aplica despues, con el
+      // ref ya avanzado) y el pellizco se anulaba en dispositivos reales.
+      const ratio = gesture.current.dist > 0 ? dist / gesture.current.dist : 1;
       let da = angle - gesture.current.angle;
       if (da > 180) da -= 360;
       if (da < -180) da += 360;
-      setRotation((v) => clamp(v + da, -180, 180));
       gesture.current = { dist, angle };
+      setScale((v) => clamp(v * ratio, 1, 5));
+      setRotation((v) => clamp(v + da, -180, 180));
     }
   }
 
