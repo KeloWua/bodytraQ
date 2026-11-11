@@ -22,6 +22,8 @@ import { nowISO, uuid } from "@/lib/utils";
 import Timeline from "@/components/Timeline";
 import CheckInForm from "@/components/CheckInForm";
 import SettingsSheet from "@/components/SettingsSheet";
+import LockScreen from "@/components/LockScreen";
+import { hasSession, lock, protectionEnabled } from "@/lib/crypto";
 import PhotoAligner from "@/components/PhotoAligner";
 import GuideEditor from "@/components/GuideEditor";
 
@@ -35,6 +37,8 @@ type Modal =
 
 export default function Page() {
   const [ready, setReady] = useState(false);
+  const [locked, setLocked] = useState(false);
+  const [protection, setProtection] = useState(false);
   const [storageOk, setStorageOk] = useState(true);
   const [quota, setQuota] = useState<Quota | null>(null);
   const [settings, setSettings] = useState<Settings>(defaultSettings());
@@ -68,7 +72,9 @@ export default function Page() {
     setRefreshKey((k) => k + 1);
   }, []);
 
-  // Arranque: seed, deteccion OPFS, limpieza de archivos huerfanos.
+  // Arranque: seed, deteccion OPFS, limpieza de archivos huerfanos. Si la
+  // proteccion esta activa y no hay sesion, la pantalla de bloqueo va primero
+  // y los datos (notas cifradas incluidas) solo se cargan tras desbloquear.
   useEffect(() => {
     (async () => {
       await ensureSeed();
@@ -85,6 +91,13 @@ export default function Page() {
         await sweepOrphans(referenced);
         setQuota(await storageEstimate());
       }
+      const prot = await protectionEnabled();
+      setProtection(prot);
+      if (prot && !hasSession()) {
+        setLocked(true);
+        setReady(true);
+        return;
+      }
       const c = await listCheckIns();
       setSettings(await getSettings());
       setViews(await activeViews());
@@ -93,6 +106,43 @@ export default function Page() {
       setReady(true);
     })();
   }, []);
+
+  // Autobloqueo: si la app pasa mas de 5 minutos en segundo plano, al volver
+  // pide la contrasena de nuevo.
+  useEffect(() => {
+    let hiddenAt: number | null = null;
+    const onVis = () => {
+      if (document.visibilityState === "hidden") {
+        hiddenAt = Date.now();
+        return;
+      }
+      void (async () => {
+        if (
+          hiddenAt !== null &&
+          Date.now() - hiddenAt > 5 * 60 * 1000 &&
+          (await protectionEnabled()) &&
+          hasSession()
+        ) {
+          lock();
+          setLocked(true);
+        }
+        hiddenAt = null;
+      })();
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, []);
+
+  async function handleUnlocked() {
+    setLocked(false);
+    setProtection(true);
+    const c = await listCheckIns();
+    setSettings(await getSettings());
+    setViews(await activeViews());
+    setCheckIns(c);
+    setIndex(Math.max(0, c.length - 1));
+    setRefreshKey((k) => k + 1);
+  }
 
   async function changeSettings(patch: Partial<Settings>) {
     await db.settings.update("current", patch);
@@ -186,6 +236,10 @@ export default function Page() {
 
   const current = checkIns[index] ?? null;
 
+  if (locked) {
+    return <LockScreen onUnlocked={handleUnlocked} />;
+  }
+
   return (
     <>
       <Timeline
@@ -244,6 +298,12 @@ export default function Page() {
           views={views}
           storageOk={storageOk}
           quota={quota}
+          protection={protection}
+          onLocked={() => setLocked(true)}
+          onSecurityChanged={async () => {
+            setProtection(await protectionEnabled());
+            await reload();
+          }}
           onChangeSettings={changeSettings}
           onAddView={async (name) => {
             const ts = nowISO();
