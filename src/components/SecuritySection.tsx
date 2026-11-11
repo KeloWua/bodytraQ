@@ -61,12 +61,11 @@ export default function SecuritySection({
         <>
           <p className="mb-3 text-xs leading-relaxed text-zinc-400">
             Cifra tus <strong className="text-zinc-200">fotos y notas</strong> en este dispositivo
-            con AES-256. La contraseña no se guarda en ningún sitio: sin ella nadie puede abrir
-            tus datos, ni siquiera con acceso al almacenamiento del navegador.
+            con AES-256: solo se abren con tu contraseña, que no se guarda en ningún sitio.
           </p>
           <p className="mb-3 text-xs leading-relaxed text-zinc-400">
-            Fechas, pesos y ajustes no se cifran. Las copias ZIP también van cifradas y se abren
-            con esta misma contraseña.
+            Fechas, pesos y ajustes no se cifran. Las copias ZIP exportadas DESPUÉS de activarla
+            van cifradas con la misma contraseña; las exportadas ANTES no lo están.
           </p>
           <p className="mb-3 rounded-xl bg-amber-500/10 p-3 text-xs leading-relaxed text-amber-200 ring-1 ring-amber-500/30">
             Si olvidas la contraseña NO hay recuperación posible.
