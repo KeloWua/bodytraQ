@@ -17,7 +17,7 @@ export interface BackupData {
   check_ins: CheckIn[];
   photos: Photo[];
   // Si la proteccion estaba activa al exportar, la copia va cifrada y lleva
-  // sal+verificador: al importarla se abre con la misma contrasena.
+  // sal + clave de datos envuelta: al importarla se abre con su contrasena.
   meta?: MetaRow[];
 }
 
@@ -57,6 +57,9 @@ export async function exportBackup(): Promise<Blob> {
 export interface ImportResult {
   ok: boolean;
   error?: string;
+  // 'confirm-downgrade': la copia no esta protegida pero el perfil actual si:
+  // importarla desactivaria la proteccion. Requiere confirmacion explicita.
+  code?: "confirm-downgrade";
   photos?: number;
   checkIns?: number;
 }
@@ -64,7 +67,10 @@ export interface ImportResult {
 // Importa una copia ZIP: valida todo ANTES de tocar los datos actuales,
 // escribe los archivos nuevos y solo entonces sustituye las tablas. Si algo
 // no cuadra, no cambia nada.
-export async function importBackup(file: File): Promise<ImportResult> {
+export async function importBackup(
+  file: File,
+  opts?: { confirmedDowngrade?: boolean }
+): Promise<ImportResult> {
   let zip: JSZip;
   try {
     zip = await JSZip.loadAsync(file);
@@ -89,6 +95,15 @@ export async function importBackup(file: File): Promise<ImportResult> {
     if (!Array.isArray(data[key])) {
       return { ok: false, error: `La copia no tiene la seccion ${key}.` };
     }
+  }
+
+  // Aviso ANTES de tocar nada: si este perfil tiene proteccion activa y la
+  // copia no la lleva, importarla desactivaria el cifrado silenciosamente.
+  const zipProtected =
+    Array.isArray(data.meta) && data.meta.some((r) => r.id === "protection");
+  const localProtected = (await db.meta.get("protection")) !== undefined;
+  if (localProtected && !zipProtected && !opts?.confirmedDowngrade) {
+    return { ok: false, code: "confirm-downgrade" };
   }
 
   // Toda ruta referenciada debe existir en el ZIP.
