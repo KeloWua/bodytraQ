@@ -109,7 +109,18 @@ export default function SettingsSheet({
     if (!window.confirm("Importar sustituye TODOS los datos actuales por los de la copia. ¿Seguir?")) return;
     setBusy(true);
     setMessage(null);
-    const res = await importBackup(file);
+    let res = await importBackup(file);
+    if (res.code === "confirm-downgrade") {
+      const sigue = window.confirm(
+        "Esta copia NO tiene proteccion con contrasena. Al importarla se DESACTIVARA la proteccion actual y tus fotos y notas quedaran sin cifrar. ¿Importar igualmente?"
+      );
+      if (!sigue) {
+        setBusy(false);
+        setMessage("Importacion cancelada: la proteccion sigue activa.");
+        return;
+      }
+      res = await importBackup(file, { confirmedDowngrade: true });
+    }
     setBusy(false);
     if (res.ok) {
       setMessage(`Copia restaurada: ${res.checkIns} registros, ${res.photos} fotos.`);
