@@ -5,6 +5,7 @@ import db, {
   type ViewProfile,
   type CheckIn,
   type Photo,
+  type MetaRow,
 } from "./db";
 import { saveBlob, readBlob, listPaths, deleteBlob, revokeUrl } from "./storage";
 
@@ -15,6 +16,9 @@ export interface BackupData {
   view_profiles: ViewProfile[];
   check_ins: CheckIn[];
   photos: Photo[];
+  // Si la proteccion estaba activa al exportar, la copia va cifrada y lleva
+  // sal+verificador: al importarla se abre con la misma contrasena.
+  meta?: MetaRow[];
 }
 
 const JSON_NAME = "bodytraq-backup.json";
@@ -34,6 +38,7 @@ export async function exportBackup(): Promise<Blob> {
     view_profiles: await db.view_profiles.toArray(),
     check_ins: await db.check_ins.toArray(),
     photos: await db.photos.toArray(),
+    meta: await db.meta.toArray(),
   };
   const zip = new JSZip();
   zip.file(JSON_NAME, JSON.stringify(data, null, 2));
@@ -112,15 +117,17 @@ export async function importBackup(file: File): Promise<ImportResult> {
 
   // Fase 2: sustituir las tablas dentro de una transaccion.
   try {
-    await db.transaction("rw", db.settings, db.view_profiles, db.check_ins, db.photos, async () => {
+    await db.transaction("rw", db.settings, db.view_profiles, db.check_ins, db.photos, db.meta, async () => {
       await db.settings.clear();
       await db.view_profiles.clear();
       await db.check_ins.clear();
       await db.photos.clear();
+      await db.meta.clear();
       await db.settings.bulkAdd(data.settings);
       await db.view_profiles.bulkAdd(data.view_profiles);
       await db.check_ins.bulkAdd(data.check_ins);
       await db.photos.bulkAdd(data.photos);
+      if (Array.isArray(data.meta)) await db.meta.bulkAdd(data.meta);
     });
   } catch {
     return { ok: false, error: "No se pudo registrar la copia en la base de datos local." };
