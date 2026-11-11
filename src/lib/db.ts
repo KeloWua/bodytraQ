@@ -60,11 +60,19 @@ export interface Stroke {
 
 export const SCHEMA_VERSION = 1;
 
+// Tabla meta: pares clave/valor internos de la app (p. ej. la sal y el
+// verificador de la proteccion con contrasena). No contiene datos del usuario.
+export interface MetaRow {
+  id: string;
+  [key: string]: unknown;
+}
+
 const db = new Dexie("bodytraq") as Dexie & {
   settings: EntityTable<Settings, "id">;
   view_profiles: EntityTable<ViewProfile, "id">;
   check_ins: EntityTable<CheckIn, "id">;
   photos: EntityTable<Photo, "id">;
+  meta: EntityTable<MetaRow, "id">;
 };
 
 db.version(1).stores({
@@ -75,6 +83,11 @@ db.version(1).stores({
   // aplica en logica (savePhoto), para que el borrado logico no bloquee
   // volver a subir una foto a la misma vista y dia.
   photos: "id, check_in_id, view_profile_id, [check_in_id+view_profile_id], deleted_at",
+});
+
+// v2: solo anade la tabla meta; los datos existentes no cambian.
+db.version(2).stores({
+  meta: "id",
 });
 
 export function defaultSettings(): Settings {
@@ -148,14 +161,19 @@ export async function activeViews(): Promise<ViewProfile[]> {
 
 export async function listCheckIns(): Promise<CheckIn[]> {
   const all = (await db.check_ins.toArray()).filter((c) => !c.deleted_at);
-  return all.sort((a, b) => a.date.localeCompare(b.date));
+  const { unsealText } = await import("./crypto");
+  const out: CheckIn[] = [];
+  for (const c of all) out.push({ ...c, notes: await unsealText(c.notes) });
+  return out.sort((a, b) => a.date.localeCompare(b.date));
 }
 
 export async function upsertCheckIn(
   date: string,
   weightKg: number | null,
-  notes: string,
+  notesPlain: string,
 ): Promise<CheckIn> {
+  const { sealText } = await import("./crypto");
+  const notes = await sealText(notesPlain);
   const existing = await db.check_ins.get({ date });
   const ts = nowISO();
   if (existing && !existing.deleted_at) {
@@ -164,7 +182,7 @@ export async function upsertCheckIn(
       notes,
       updated_at: ts,
     });
-    return { ...existing, weight_kg: weightKg, notes, updated_at: ts };
+    return { ...existing, weight_kg: weightKg, notes: notesPlain, updated_at: ts };
   }
   if (existing && existing.deleted_at) {
     // Reutiliza la fila borrada para no violar el indice unico de fecha.
@@ -174,7 +192,7 @@ export async function upsertCheckIn(
       updated_at: ts,
       deleted_at: null,
     });
-    return { ...existing, weight_kg: weightKg, notes, updated_at: ts, deleted_at: null };
+    return { ...existing, weight_kg: weightKg, notes: notesPlain, updated_at: ts, deleted_at: null };
   }
   const row: CheckIn = {
     id: uuid(),
@@ -186,7 +204,7 @@ export async function upsertCheckIn(
     deleted_at: null,
   };
   await db.check_ins.add(row);
-  return row;
+  return { ...row, notes: notesPlain };
 }
 
 export async function photosOf(checkInId: string): Promise<Photo[]> {
