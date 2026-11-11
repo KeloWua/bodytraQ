@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import type { Settings, ViewProfile } from "@/lib/db";
 import type { Quota } from "@/lib/storage";
 import { importBackup, exportBackup } from "@/lib/backup";
+import SecuritySection from "./SecuritySection";
 import { IconDownload, IconGuides, IconPencil, IconTrash, IconUpload, IconX } from "./icons";
 
 function Switch({
@@ -54,6 +55,9 @@ export default function SettingsSheet({
   views,
   storageOk,
   quota,
+  protection,
+  onLocked,
+  onSecurityChanged,
   onChangeSettings,
   onAddView,
   onRenameView,
@@ -66,6 +70,9 @@ export default function SettingsSheet({
   views: ViewProfile[];
   storageOk: boolean;
   quota: Quota | null;
+  protection: boolean;
+  onLocked: () => void;
+  onSecurityChanged: () => void;
   onChangeSettings: (patch: Partial<Settings>) => void;
   onAddView: (name: string) => void;
   onRenameView: (id: string, name: string) => void;
@@ -286,6 +293,8 @@ export default function SettingsSheet({
             </button>
           </div>
         </Section>
+
+        <SecuritySection enabled={protection} onLocked={onLocked} onChanged={onSecurityChanged} />
 
         <Section title="Copia de seguridad">
           <p className="mb-3 text-xs leading-relaxed text-zinc-400">
