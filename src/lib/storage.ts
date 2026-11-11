@@ -84,11 +84,22 @@ const urlCache = new Map<string, string>();
 export async function objectUrl(path: string): Promise<string | null> {
   const hit = urlCache.get(path);
   if (hit) return hit;
-  const blob = await readBlob(path);
-  if (!blob) return null;
+  const raw = await readBlob(path);
+  if (!raw) return null;
+  // Descifrado transparente cuando la proteccion esta activa (importacion
+  // diferida para no crear ciclo de modulos en frio).
+  const { unsealBlob } = await import("./crypto");
+  const blob = await unsealBlob(raw);
+  if (!blob) return null; // cifrado y sin sesion: la UI muestra la pantalla de bloqueo
   const url = URL.createObjectURL(blob);
   urlCache.set(path, url);
   return url;
+}
+
+// Al bloquear o recifrar: suelta las URLs en memoria de fotos descifradas.
+export function clearUrlCache(): void {
+  for (const url of urlCache.values()) URL.revokeObjectURL(url);
+  urlCache.clear();
 }
 
 export function revokeUrl(path: string): void {
