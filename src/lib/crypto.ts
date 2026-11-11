@@ -1,15 +1,23 @@
 // Proteccion local con contrasena (opt-in desde Ajustes > Seguridad).
 //
-// - PBKDF2-SHA256 (600.000 iteraciones) deriva una clave AES-GCM de 256 bits.
-// - La clave SOLO vive en memoria mientras la app esta desbloqueada; la
-//   contrasena nunca se guarda. Solo se guarda sal + un verificador cifrado.
-// - Fotos cifradas (OPFS): "BTQ1" (4 bytes) + iv(12) + cifrado. El prefijo
-//   hace cada archivo autodescriptivo: un corte a mitad de la migracion no
-//   deja estado mixto ilegible.
-// - Notas cifradas (IndexedDB): "BTQ1:" + base64(iv + cifrado).
-// - NO se cifran: fechas, pesos ni ajustes (metadatos necesarios para la app).
-// - Sin recuperacion: si se olvida la contrasena, los datos cifrados no se
-//   pueden abrir. El usuario lo confirma expresamente al activarla.
+// Modelo: una CLAVE DE DATOS AES-GCM de 256 bits fija, generada al azar, que
+// se guarda "envuelta" (cifrada) con una clave derivada de la contrasena
+// (PBKDF2-SHA256, 600.000 iteraciones). La contrasena nunca se guarda y la
+// clave de datos solo existe en memoria con la app desbloqueada.
+//
+// Por que envolver y no recifrar: cambiar la contrasena solo reescribe la
+// envoltura (UNA escritura atomica en IndexedDB); los archivos nunca se
+// recifran, asi que ningun corte a mitad deja fotos irrecuperables.
+//
+// Orden seguro ante cortes:
+// - Activar: primero se guarda la envoltura, despues se cifran los datos.
+//   Un corte deja proteccion activa y legible con la contrasena elegida.
+// - Desactivar: primero se descifra todo, despues se borra la envoltura.
+//   Un corte deja la proteccion activa; al desbloquear se recifra lo
+//   descifrado a medias (autocuracion) y se puede reintentar.
+// - Fotos cifradas: prefijo "BTQ1" + iv(12) + cifrado (autodescriptivo).
+// - Notas cifradas: "BTQ1:" + base64(iv + cifrado).
+// - NO se cifran fechas, pesos ni ajustes. Sin recuperacion de contrasena.
 
 import db from "./db";
 import { listPaths, readBlob, saveBlob, clearUrlCache } from "./storage";
@@ -17,7 +25,6 @@ import { listPaths, readBlob, saveBlob, clearUrlCache } from "./storage";
 const MAGIC = new Uint8Array([0x42, 0x54, 0x51, 0x31]); // "BTQ1"
 const TEXT_PREFIX = "BTQ1:";
 const ITERATIONS = 600_000;
-const VERIFIER_PLAINTEXT = "bodytraq-key-check-v1";
 
 let sessionKey: CryptoKey | null = null;
 
@@ -29,10 +36,10 @@ export class WrongPasswordError extends Error {
 
 export interface ProtectionMeta {
   id: string; // siempre "protection"
-  salt: string; // base64
-  verifier_iv: string; // base64
-  verifier_ct: string; // base64
+  salt: string; // base64, sal del PBKDF2
   iterations: number;
+  wrapped_iv: string; // base64, iv con que la KEK cifra la clave de datos
+  wrapped_key: string; // base64, clave de datos cifrada con la KEK
 }
 
 function b64e(buf: Uint8Array): string {
@@ -61,7 +68,7 @@ export function hasSession(): boolean {
   return sessionKey !== null;
 }
 
-async function deriveKey(password: string, salt: Uint8Array, iterations: number): Promise<CryptoKey> {
+async function deriveKek(password: string, salt: Uint8Array, iterations: number): Promise<CryptoKey> {
   const base = await crypto.subtle.importKey(
     "raw",
     new TextEncoder().encode(password),
@@ -78,35 +85,55 @@ async function deriveKey(password: string, salt: Uint8Array, iterations: number)
   );
 }
 
-async function makeVerifier(key: CryptoKey): Promise<{ iv: string; ct: string }> {
+async function wrapDataKey(raw: Uint8Array, kek: CryptoKey): Promise<{ iv: string; key: string }> {
   const iv = crypto.getRandomValues(new Uint8Array(12));
-  const ct = await crypto.subtle.encrypt(
-    { name: "AES-GCM", iv: iv as BufferSource },
-    key,
-    new TextEncoder().encode(VERIFIER_PLAINTEXT),
-  );
-  return { iv: b64e(iv), ct: b64e(new Uint8Array(ct)) };
+  const ct = await crypto.subtle.encrypt({ name: "AES-GCM", iv: iv as BufferSource }, kek, raw as BufferSource);
+  return { iv: b64e(iv), key: b64e(new Uint8Array(ct)) };
 }
 
-async function checkVerifier(key: CryptoKey, meta: ProtectionMeta): Promise<boolean> {
+// Desenvuelve la clave de datos con la contrasena. AES-GCM falla si la
+// contrasena no es la correcta: eso es la verificacion.
+async function unwrapDataKey(password: string, meta: ProtectionMeta): Promise<CryptoKey> {
+  const kek = await deriveKek(password, b64d(meta.salt), meta.iterations);
+  let raw: ArrayBuffer;
   try {
-    const pt = await crypto.subtle.decrypt(
-      { name: "AES-GCM", iv: b64d(meta.verifier_iv) as BufferSource },
-      key,
-      b64d(meta.verifier_ct) as BufferSource,
+    raw = await crypto.subtle.decrypt(
+      { name: "AES-GCM", iv: b64d(meta.wrapped_iv) as BufferSource },
+      kek,
+      b64d(meta.wrapped_key) as BufferSource,
     );
-    return new TextDecoder().decode(pt) === VERIFIER_PLAINTEXT;
   } catch {
-    return false;
+    throw new WrongPasswordError();
   }
+  return crypto.subtle.importKey("raw", raw, { name: "AES-GCM", length: 256 }, false, [
+    "encrypt",
+    "decrypt",
+  ]);
+}
+
+// Cifra con BTQ1 cualquier foto suelta en claro (autocuracion tras un corte
+// a mitad de activacion o de desactivacion). Idempotente y barata en no-op.
+async function healPlaintext(key: CryptoKey): Promise<void> {
+  for (const path of await listPaths()) {
+    const blob = await readBlob(path);
+    if (!blob) continue;
+    const next = await encryptBlob(blob, key);
+    if (next !== blob) await saveBlob(path, next);
+  }
+  const rows = await db.check_ins.toArray();
+  for (const row of rows) {
+    if (row.notes && !row.notes.startsWith(TEXT_PREFIX)) {
+      await db.check_ins.update(row.id, { notes: await encryptText(row.notes, key) });
+    }
+  }
+  clearUrlCache();
 }
 
 export async function unlock(password: string): Promise<void> {
   const meta = await protectionMeta();
   if (!meta) throw new Error("La proteccion no esta activada.");
-  const key = await deriveKey(password, b64d(meta.salt), meta.iterations);
-  if (!(await checkVerifier(key, meta))) throw new WrongPasswordError();
-  sessionKey = key;
+  sessionKey = await unwrapDataKey(password, meta);
+  await healPlaintext(sessionKey);
 }
 
 export function lock(): void {
@@ -170,20 +197,20 @@ async function decryptText(text: string, key: CryptoKey): Promise<string> {
 
 // --- Puntos de entrada usados por la app --------------------------------------
 
-// Escritura de fotos: cifrar si hay sesion activa.
 export async function sealBlob(blob: Blob): Promise<Blob> {
   if (!sessionKey) return blob;
   return encryptBlob(blob, sessionKey);
 }
 
-// Lectura de fotos: descifrar si el archivo lleva el prefijo. Sin sesion no
-// se puede leer: devuelve null y la interfaz (detras de la pantalla de
-// bloqueo) no muestra nada.
 export async function unsealBlob(blob: Blob): Promise<Blob | null> {
   const head = new Uint8Array(await blob.slice(0, MAGIC.length).arrayBuffer());
   if (!hasMagic(head)) return blob;
-  if (!sessionKey) return null;
-  return decryptBlob(blob, sessionKey);
+  if (!sessionKey) return null; // bloqueado: la UI muestra la pantalla de bloqueo
+  try {
+    return await decryptBlob(blob, sessionKey);
+  } catch {
+    return null; // no descifrable con la clave de sesion: no mostrar bytes rotos
+  }
 }
 
 export async function sealText(text: string): Promise<string> {
@@ -201,99 +228,82 @@ export async function unsealText(text: string): Promise<string> {
   }
 }
 
-// --- Activacion / migracion / cambio / desactivacion --------------------------
-
-// Cifra todos los datos existentes (fotos en OPFS y notas). Seguro ante
-// cortes: cada archivo/nota cifrado se marca con el prefijo BTQ1.
-async function migrateAll(direction: "encrypt" | "decrypt", key: CryptoKey): Promise<void> {
-  for (const path of await listPaths()) {
-    const blob = await readBlob(path);
-    if (!blob) continue;
-    const next =
-      direction === "encrypt" ? await encryptBlob(blob, key) : await decryptBlob(blob, key);
-    if (next !== blob) {
-      await saveBlob(path, next);
-    }
-  }
-  clearUrlCache();
-  const rows = await db.check_ins.toArray();
-  for (const row of rows) {
-    if (!row.notes) continue;
-    if (direction === "encrypt") {
-      if (!row.notes.startsWith(TEXT_PREFIX)) {
-        await db.check_ins.update(row.id, { notes: await encryptText(row.notes, key) });
-      }
-    } else if (row.notes.startsWith(TEXT_PREFIX)) {
-      try {
-        await db.check_ins.update(row.id, { notes: await decryptText(row.notes, key) });
-      } catch {
-        // no se puede descifrar con esta clave: se deja como esta
-      }
-    }
-  }
-}
+// --- Activacion / cambio / desactivacion --------------------------------------
 
 export async function enableProtection(password: string): Promise<void> {
   if (await protectionEnabled()) throw new Error("La proteccion ya esta activada.");
+  const raw = crypto.getRandomValues(new Uint8Array(32));
   const salt = crypto.getRandomValues(new Uint8Array(16));
-  const key = await deriveKey(password, salt, ITERATIONS);
-  const v = await makeVerifier(key);
-  sessionKey = key;
-  try {
-    await migrateAll("encrypt", key);
-    await db.meta.put({
-      id: "protection",
-      salt: b64e(salt),
-      verifier_iv: v.iv,
-      verifier_ct: v.ct,
-      iterations: ITERATIONS,
-    });
-  } catch (e) {
-    sessionKey = null;
-    throw e;
-  }
-}
-
-export async function changePassword(current: string, next: string): Promise<void> {
-  const meta = await protectionMeta();
-  if (!meta) throw new Error("La proteccion no esta activada.");
-  const oldKey = await deriveKey(current, b64d(meta.salt), meta.iterations);
-  if (!(await checkVerifier(oldKey, meta))) throw new WrongPasswordError();
-  const salt = crypto.getRandomValues(new Uint8Array(16));
-  const newKey = await deriveKey(next, salt, ITERATIONS);
-  // Recifrar todo con la nueva clave.
-  for (const path of await listPaths()) {
-    const blob = await readBlob(path);
-    if (!blob) continue;
-    const plain = await decryptBlob(blob, oldKey);
-    await saveBlob(path, await encryptBlob(plain, newKey));
-  }
-  clearUrlCache();
-  const rows = await db.check_ins.toArray();
-  for (const row of rows) {
-    if (row.notes && row.notes.startsWith(TEXT_PREFIX)) {
-      const plain = await decryptText(row.notes, oldKey);
-      await db.check_ins.update(row.id, { notes: await encryptText(plain, newKey) });
-    }
-  }
-  const v = await makeVerifier(newKey);
+  const kek = await deriveKek(password, salt, ITERATIONS);
+  const w = await wrapDataKey(raw, kek);
+  // PRIMERO la envoltura: cualquier dato cifrado a partir de aqui siempre
+  // tiene su clave recuperable con la contrasena elegida.
   await db.meta.put({
     id: "protection",
     salt: b64e(salt),
-    verifier_iv: v.iv,
-    verifier_ct: v.ct,
     iterations: ITERATIONS,
+    wrapped_iv: w.iv,
+    wrapped_key: w.key,
   });
-  sessionKey = newKey;
+  sessionKey = await crypto.subtle.importKey("raw", raw as BufferSource, { name: "AES-GCM", length: 256 }, false, [
+    "encrypt",
+    "decrypt",
+  ]);
+  await healPlaintext(sessionKey);
+}
+
+// Cambiar la contrasena NO recifra datos: solo desenvuelve la clave de datos
+// con la contrasena actual y la envuelve con la nueva (una escritura).
+export async function changePassword(current: string, next: string): Promise<void> {
+  const meta = await protectionMeta();
+  if (!meta) throw new Error("La proteccion no esta activada.");
+  const kekOld = await deriveKek(current, b64d(meta.salt), meta.iterations);
+  let raw: ArrayBuffer;
+  try {
+    raw = await crypto.subtle.decrypt(
+      { name: "AES-GCM", iv: b64d(meta.wrapped_iv) as BufferSource },
+      kekOld,
+      b64d(meta.wrapped_key) as BufferSource,
+    );
+  } catch {
+    throw new WrongPasswordError();
+  }
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const kekNew = await deriveKek(next, salt, ITERATIONS);
+  const w = await wrapDataKey(new Uint8Array(raw), kekNew);
+  await db.meta.put({
+    id: "protection",
+    salt: b64e(salt),
+    iterations: ITERATIONS,
+    wrapped_iv: w.iv,
+    wrapped_key: w.key,
+  });
+  // La clave de datos no cambia: la sesion sigue valiendo.
 }
 
 export async function disableProtection(password: string): Promise<void> {
   const meta = await protectionMeta();
   if (!meta) return;
-  const key = await deriveKey(password, b64d(meta.salt), meta.iterations);
-  if (!(await checkVerifier(key, meta))) throw new WrongPasswordError();
-  await migrateAll("decrypt", key);
+  const key = await unwrapDataKey(password, meta);
+  // PRIMERO descifrar todo; si hay un corte, la proteccion sigue activa y el
+  // desbloqueo recifra lo pendiente (autocuracion): nada queda irrecuperable.
+  for (const path of await listPaths()) {
+    const blob = await readBlob(path);
+    if (!blob) continue;
+    const next = await decryptBlob(blob, key);
+    if (next !== blob) await saveBlob(path, next);
+  }
+  const rows = await db.check_ins.toArray();
+  for (const row of rows) {
+    if (row.notes && row.notes.startsWith(TEXT_PREFIX)) {
+      try {
+        await db.check_ins.update(row.id, { notes: await decryptText(row.notes, key) });
+      } catch {
+        // no descifrable con esta clave: se deja como esta
+      }
+    }
+  }
+  clearUrlCache();
   await db.meta.delete("protection");
   sessionKey = null;
-  clearUrlCache();
 }
