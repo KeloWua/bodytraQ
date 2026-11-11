@@ -19,10 +19,11 @@ export async function savePhoto(
   const thumb_path = `${id}_thumb.jpg`;
   const original_path = input.original ? `${id}_original` : null;
 
-  await saveBlob(display_path, input.display);
-  await saveBlob(thumb_path, input.thumb);
+  const { sealBlob } = await import("./crypto");
+  await saveBlob(display_path, await sealBlob(input.display));
+  await saveBlob(thumb_path, await sealBlob(input.thumb));
   if (input.original && original_path) {
-    await saveBlob(original_path, input.original);
+    await saveBlob(original_path, await sealBlob(input.original));
   }
 
   const ts = nowISO();
