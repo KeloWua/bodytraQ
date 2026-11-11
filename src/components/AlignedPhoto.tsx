@@ -1,6 +1,7 @@
 "use client";
 
 import type { Stroke } from "@/lib/db";
+import { IconPencil } from "./icons";
 
 export interface PhotoTransform {
   width: number;
@@ -75,6 +76,7 @@ export default function AlignedPhoto({
   showGuides = true,
   placeholder,
   badges,
+  onClick,
 }: {
   srcUrl: string | null;
   transform: PhotoTransform | null;
@@ -82,9 +84,18 @@ export default function AlignedPhoto({
   showGuides?: boolean;
   placeholder?: React.ReactNode;
   badges?: React.ReactNode;
+  onClick?: () => void;
 }) {
+  const editable = Boolean(onClick && srcUrl && transform);
   return (
-    <div className="relative aspect-[3/4] w-full touch-none overflow-hidden rounded-2xl bg-zinc-900 ring-1 ring-white/10 shadow-xl shadow-black/40 select-none">
+    <div
+      className={`relative aspect-[3/4] w-full touch-none overflow-hidden rounded-2xl bg-zinc-900 ring-1 ring-white/10 shadow-xl shadow-black/40 select-none ${
+        editable ? "cursor-pointer" : ""
+      }`}
+      onClick={editable ? onClick : undefined}
+      role={editable ? "button" : undefined}
+      aria-label={editable ? "Reeditar alineacion de la foto" : undefined}
+    >
       {srcUrl && transform ? (
         <div
           className="absolute inset-0"
@@ -107,6 +118,11 @@ export default function AlignedPhoto({
       )}
       {showGuides && guides && guides.length > 0 && <GuideLayer strokes={guides} />}
       {badges}
+      {editable && (
+        <span className="pointer-events-none absolute top-2 right-2 flex h-8 w-8 items-center justify-center rounded-full bg-zinc-950/70 text-lime-300 ring-1 ring-white/15 backdrop-blur-sm">
+          <IconPencil className="h-4 w-4" />
+        </span>
+      )}
     </div>
   );
 }
