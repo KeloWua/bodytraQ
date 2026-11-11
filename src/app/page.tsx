@@ -335,7 +335,17 @@ export default function Page() {
             const v = views.find((x) => x.id === id);
             if (v) void openGuides(v);
           }}
-          onImported={reload}
+          onImported={async () => {
+            if ((await protectionEnabled()) && !hasSession()) {
+              // La copia importada esta cifrada con otra o la misma contrasena:
+              // toca desbloquear para ver nada.
+              setProtection(true);
+              setLocked(true);
+              return;
+            }
+            setProtection(await protectionEnabled());
+            await reload();
+          }}
           onClose={() => setModal({ kind: "none" })}
         />
       )}
