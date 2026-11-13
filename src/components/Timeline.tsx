@@ -210,9 +210,6 @@ export default function Timeline({
             {settings.show_weight && settings.show_bmi && weightLabel() && bmiLabel() ? " · " : ""}
             {settings.show_bmi && bmiLabel()}
           </div>
-          {current?.notes && (
-            <p className="mt-2 px-4 text-xs italic text-zinc-500">{current.notes}</p>
-          )}
         </div>
       </header>
 
@@ -259,6 +256,23 @@ export default function Timeline({
           <IconGuides className="h-4.5 w-4.5" />
         </button>
       </div>
+
+      {current?.notes.trim() && (
+        <section className="mx-3 mt-3 min-w-0 rounded-2xl bg-zinc-900/70 p-3 ring-1 ring-white/10">
+          <h2 id="timeline-notes-heading" className="mb-1 text-xs font-medium text-zinc-400">
+            Notas del registro
+          </h2>
+          <div
+            key={current.id}
+            role="region"
+            aria-labelledby="timeline-notes-heading"
+            tabIndex={0}
+            className="max-h-32 overflow-y-auto overscroll-contain rounded-sm text-sm leading-relaxed whitespace-pre-wrap text-zinc-300 [overflow-wrap:anywhere] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lime-400"
+          >
+            {current.notes}
+          </div>
+        </section>
+      )}
 
       <main
         className={`grid flex-1 content-center gap-3 px-3 pt-2 pb-4 ${
