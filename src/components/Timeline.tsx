@@ -210,6 +210,9 @@ export default function Timeline({
             {settings.show_weight && settings.show_bmi && weightLabel() && bmiLabel() ? " · " : ""}
             {settings.show_bmi && bmiLabel()}
           </div>
+          {current?.notes && (
+            <p className="mt-2 px-4 text-xs italic text-zinc-500">{current.notes}</p>
+          )}
         </div>
       </header>
 
