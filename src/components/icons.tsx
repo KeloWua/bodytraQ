@@ -56,6 +56,11 @@ export const IconPhoto = (p: P) =>
   </>);
 export const IconPencil = (p: P) =>
   base(p, <path d="M17 3a2.8 2.8 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />);
+export const IconTimer = (p: P) =>
+  base(p, <>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M12 7v5l3 3" />
+  </>);
 
 export function IconLock({ className }: { className?: string }) {
   return (
