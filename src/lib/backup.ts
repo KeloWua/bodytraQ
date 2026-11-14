@@ -106,13 +106,37 @@ export async function importBackup(
     return { ok: false, error: "El JSON de la copia no se puede leer." };
   }
 
-  if (data.schema_version !== SCHEMA_VERSION) {
+  // Se aceptan las copias de la app actual (SCHEMA_VERSION) y las del
+  // formato anterior (1, sin papelera ni active_key). Otras se rechazan.
+  if (data.schema_version !== SCHEMA_VERSION && data.schema_version !== 1) {
     return { ok: false, error: `Version de copia no soportada (${data.schema_version}).` };
   }
   for (const key of ["settings", "view_profiles", "check_ins", "photos"] as const) {
     if (!Array.isArray(data[key])) {
       return { ok: false, error: `La copia no tiene la seccion ${key}.` };
     }
+  }
+
+  // Normaliza y valida los registros ANTES de tocar nada: las copias del
+  // formato 1 no llevan active_key, y la unicidad por fecha depende de el.
+  const seenKeys = new Set<string>();
+  const normCheckIns: CheckIn[] = [];
+  for (const raw of data.check_ins as Partial<CheckIn>[]) {
+    if (!raw || typeof raw.id !== "string" || !raw.id || typeof raw.date !== "string" || !raw.date) {
+      return { ok: false, error: "La copia tiene registros sin id o sin fecha." };
+    }
+    const deleted = raw.deleted_at ?? null;
+    const active_key =
+      typeof raw.active_key === "string" && raw.active_key
+        ? raw.active_key
+        : deleted
+          ? `${raw.date}#deleted#${raw.id}`
+          : raw.date;
+    if (seenKeys.has(active_key)) {
+      return { ok: false, error: "La copia tiene dos registros activos para la misma fecha." };
+    }
+    seenKeys.add(active_key);
+    normCheckIns.push({ ...(raw as CheckIn), deleted_at: deleted, active_key });
   }
 
   // Aviso ANTES de tocar nada: si este perfil tiene proteccion activa y la
@@ -158,7 +182,7 @@ export async function importBackup(
       await db.meta.clear();
       await db.settings.bulkAdd(data.settings);
       await db.view_profiles.bulkAdd(data.view_profiles);
-      await db.check_ins.bulkAdd(data.check_ins);
+      await db.check_ins.bulkAdd(normCheckIns);
       await db.photos.bulkAdd(data.photos);
       if (Array.isArray(data.meta)) await db.meta.bulkAdd(data.meta);
     });
