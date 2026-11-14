@@ -33,12 +33,16 @@ import LockScreen from "@/components/LockScreen";
 import { hasSession, lock, protectionEnabled } from "@/lib/crypto";
 import PhotoAligner from "@/components/PhotoAligner";
 import GuideEditor from "@/components/GuideEditor";
+import CameraCapture from "@/components/CameraCapture";
+import { IconCamera, IconPhoto } from "@/components/icons";
 
 type Modal =
   | { kind: "none" }
   | { kind: "checkin"; editing?: CheckIn }
   | { kind: "settings" }
   | { kind: "trash" }
+  | { kind: "addchoice"; viewId: string }
+  | { kind: "camera"; checkInId: string; viewId: string }
   | { kind: "align"; checkInId: string; viewId: string; file: File }
   | { kind: "realign"; photo: Photo }
   | { kind: "guides"; view: ViewProfile };
@@ -355,8 +359,8 @@ export default function Page() {
         storageOk={storageOk}
         onIndex={setIndex}
         onAddPhoto={(viewId) => {
-          pendingView.current = viewId;
-          fileRef.current?.click();
+          if (!current) return;
+          setModal({ kind: "addchoice", viewId });
         }}
         onEditPhoto={(photo) => setModal({ kind: "realign", photo })}
         onNewCheckIn={() => setModal({ kind: "checkin" })}
@@ -485,6 +489,68 @@ export default function Page() {
             </button>
           </div>
         </div>
+      )}
+
+      {modal.kind === "addchoice" && (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 backdrop-blur-sm"
+          onClick={() => setModal({ kind: "none" })}
+        >
+          <div
+            className="w-full max-w-md space-y-3 rounded-t-3xl bg-zinc-900 p-5 pb-8 ring-1 ring-white/10"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p className="text-center text-sm font-semibold">Añadir foto</p>
+            <button
+              onClick={() =>
+                current &&
+                setModal({ kind: "camera", checkInId: current.id, viewId: modal.viewId })
+              }
+              className="flex w-full items-center gap-3 rounded-2xl bg-zinc-800 p-4 text-left ring-1 ring-white/10 transition active:scale-[0.98]"
+            >
+              <IconCamera className="h-6 w-6 shrink-0 text-lime-400" />
+              <span>
+                <span className="block text-sm font-semibold">Cámara con guías</span>
+                <span className="block text-xs text-zinc-400">
+                  Cámara en directo con tus líneas encima para encuadrar igual.
+                </span>
+              </span>
+            </button>
+            <button
+              onClick={() => {
+                pendingView.current = modal.viewId;
+                setModal({ kind: "none" });
+                // El click va en el mismo gesto del usuario: diferirlo con
+                // setTimeout haria que iOS no abriese el selector de archivos.
+                fileRef.current?.click();
+              }}
+              className="flex w-full items-center gap-3 rounded-2xl bg-zinc-800 p-4 text-left ring-1 ring-white/10 transition active:scale-[0.98]"
+            >
+              <IconPhoto className="h-6 w-6 shrink-0 text-zinc-300" />
+              <span>
+                <span className="block text-sm font-semibold">Subir o hacer foto normal</span>
+                <span className="block text-xs text-zinc-400">
+                  Galería o cámara del sistema, como hasta ahora.
+                </span>
+              </span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {modal.kind === "camera" && (
+        <CameraCapture
+          guides={parseGuidesSafe(views.find((v) => v.id === modal.viewId)?.guides)}
+          onCapture={(file) =>
+            setModal({ kind: "align", checkInId: modal.checkInId, viewId: modal.viewId, file })
+          }
+          onCancel={() => setModal({ kind: "none" })}
+          onUseFile={() => {
+            pendingView.current = modal.viewId;
+            setModal({ kind: "none" });
+            fileRef.current?.click();
+          }}
+        />
       )}
 
       {modal.kind === "align" && alignData && (
