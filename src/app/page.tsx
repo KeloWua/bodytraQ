@@ -4,10 +4,16 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import db, {
   activeViews,
   defaultSettings,
+  deleteForever,
+  drainOutbox,
   ensureSeed,
   getSettings,
   listCheckIns,
+  listTrashed,
+  moveToTrash,
   photosOf,
+  purgeExpired,
+  restoreCheckIn,
   upsertCheckIn,
   type CheckIn,
   type Photo,
@@ -22,6 +28,7 @@ import { nowISO, uuid } from "@/lib/utils";
 import Timeline from "@/components/Timeline";
 import CheckInForm from "@/components/CheckInForm";
 import SettingsSheet from "@/components/SettingsSheet";
+import TrashView from "@/components/TrashView";
 import LockScreen from "@/components/LockScreen";
 import { hasSession, lock, protectionEnabled } from "@/lib/crypto";
 import PhotoAligner from "@/components/PhotoAligner";
@@ -31,9 +38,16 @@ type Modal =
   | { kind: "none" }
   | { kind: "checkin"; editing?: CheckIn }
   | { kind: "settings" }
+  | { kind: "trash" }
   | { kind: "align"; checkInId: string; viewId: string; file: File }
   | { kind: "realign"; photo: Photo }
   | { kind: "guides"; view: ViewProfile };
+
+// Toast de deshacer tras mover a papelera.
+interface UndoToast {
+  checkInId: string;
+  toastId: number; // identificador unico para comparar en setTimeout
+}
 
 export default function Page() {
   const [ready, setReady] = useState(false);
@@ -60,6 +74,10 @@ export default function Page() {
     url: null,
     t: null,
   });
+  // Papelera
+  const [trashed, setTrashed] = useState<CheckIn[]>([]);
+  const [undoToast, setUndoToast] = useState<UndoToast | null>(null);
+  const toastCounter = useRef(0);
   const fileRef = useRef<HTMLInputElement>(null);
   const pendingView = useRef<string | null>(null);
 
@@ -72,12 +90,20 @@ export default function Page() {
     setRefreshKey((k) => k + 1);
   }, []);
 
-  // Arranque: seed, deteccion OPFS, limpieza de archivos huerfanos. Si la
-  // proteccion esta activa y no hay sesion, la pantalla de bloqueo va primero
-  // y los datos (notas cifradas incluidas) solo se cargan tras desbloquear.
+  // Arranque: seed, deteccion OPFS, drenaje de outbox, purga de papelera,
+  // limpieza de archivos huerfanos. Si la proteccion esta activa y no hay
+  // sesion, la pantalla de bloqueo va primero y los datos (notas cifradas
+  // incluidas) solo se cargan tras desbloquear. La purga usa solo metadatos
+  // no cifrados (deleted_at y fechas): no desencripta nada.
   useEffect(() => {
     (async () => {
       await ensureSeed();
+      // Drenar outbox SIEMPRE antes de purgar nuevos: completa cualquier
+      // purga interrumpida sin pedir contraseña.
+      await drainOutbox();
+      // Purga automatica de papelera a los 30 dias. Funciona con app bloqueada
+      // porque solo lee deleted_at (no cifrado) y borra filas.
+      await purgeExpired();
       const ok = await opfsSupported();
       setStorageOk(ok);
       if (ok) {
@@ -98,10 +124,11 @@ export default function Page() {
         setReady(true);
         return;
       }
-      const c = await listCheckIns();
+      const [c, t] = await Promise.all([listCheckIns(), listTrashed()]);
       setSettings(await getSettings());
       setViews(await activeViews());
       setCheckIns(c);
+      setTrashed(t);
       setIndex(Math.max(0, c.length - 1));
       setReady(true);
     })();
@@ -136,12 +163,90 @@ export default function Page() {
   async function handleUnlocked() {
     setLocked(false);
     setProtection(true);
-    const c = await listCheckIns();
+    const [c, t] = await Promise.all([listCheckIns(), listTrashed()]);
     setSettings(await getSettings());
     setViews(await activeViews());
     setCheckIns(c);
+    setTrashed(t);
     setIndex(Math.max(0, c.length - 1));
     setRefreshKey((k) => k + 1);
+  }
+
+  // --- Papelera ---------------------------------------------------------------
+
+  async function handleMoveToTrash(checkInId: string) {
+    await moveToTrash(checkInId);
+    const id = ++toastCounter.current;
+    setUndoToast({ checkInId, toastId: id });
+    // Ocultar toast tras 5 segundos, solo si sigue siendo el mismo toast.
+    setTimeout(() => {
+      setUndoToast((prev) => (prev && prev.toastId === id ? null : prev));
+    }, 5000);
+    await reload();
+    const t = await listTrashed();
+    setTrashed(t);
+  }
+
+  async function handleUndoTrash(checkInId: string) {
+    setUndoToast(null);
+    const result = await restoreCheckIn(checkInId);
+    if (result.ok) {
+      await reload();
+      const t = await listTrashed();
+      setTrashed(t);
+    }
+  }
+
+  async function handleRestoreFromTrash(checkInId: string) {
+    const result = await restoreCheckIn(checkInId);
+    if (result.conflict) {
+      // Ya existe un activo con esa fecha: preguntar si se quiere sustituir.
+      const confirmReplace = window.confirm(
+        "Ya existe un registro activo para esa fecha. ¿Mover el actual a la papelera y restaurar este?"
+      );
+      if (!confirmReplace) return;
+      // Encuentra el activo que ocupa la fecha directamente de la DB.
+      const trashedItem = trashed.find((t) => t.id === checkInId);
+      if (!trashedItem) return;
+      const activeWithSameDate = await db.check_ins.get({ active_key: trashedItem.date });
+      if (activeWithSameDate) {
+        await moveToTrash(activeWithSameDate.id);
+      }
+      // Ahora restaura el de la papelera.
+      const result2 = await restoreCheckIn(checkInId);
+      if (result2.ok) {
+        await reload();
+        const t = await listTrashed();
+        setTrashed(t);
+      }
+    } else if (result.ok) {
+      await reload();
+      const t = await listTrashed();
+      setTrashed(t);
+    }
+  }
+
+  async function handleDeleteForever(checkInId: string) {
+    await deleteForever(checkInId);
+    // Drenar outbox inmediatamente para borrar archivos OPFS.
+    await drainOutbox();
+    const t = await listTrashed();
+    setTrashed(t);
+    await reload();
+  }
+
+  async function handleEmptyTrash() {
+    if (trashed.length === 0) return;
+    const confirmEmpty = window.confirm(
+      `¿Vaciar la papelera? Se eliminarán definitivamente ${trashed.length} registro(s) y sus fotos.`
+    );
+    if (!confirmEmpty) return;
+    for (const item of trashed) {
+      await deleteForever(item.id);
+    }
+    await drainOutbox();
+    setTrashed([]);
+    await reload();
   }
 
   async function changeSettings(patch: Partial<Settings>) {
@@ -256,6 +361,7 @@ export default function Page() {
         onEditPhoto={(photo) => setModal({ kind: "realign", photo })}
         onNewCheckIn={() => setModal({ kind: "checkin" })}
         onEditCheckIn={() => current && setModal({ kind: "checkin", editing: current })}
+        onMoveToTrash={(id) => current && current.id === id && handleMoveToTrash(id)}
         onOpenSettings={() => setModal({ kind: "settings" })}
         refreshKey={refreshKey}
       />
@@ -299,6 +405,7 @@ export default function Page() {
           storageOk={storageOk}
           quota={quota}
           protection={protection}
+          trashedCount={trashed.length}
           onLocked={() => setLocked(true)}
           onSecurityChanged={async () => {
             setProtection(await protectionEnabled());
@@ -349,7 +456,35 @@ export default function Page() {
             await reload();
           }}
           onClose={() => setModal({ kind: "none" })}
+          onOpenTrash={() => setModal({ kind: "trash" })}
         />
+      )}
+
+      {modal.kind === "trash" && (
+        <TrashView
+          trashed={trashed}
+          onRestore={handleRestoreFromTrash}
+          onDeleteForever={handleDeleteForever}
+          onEmptyTrash={handleEmptyTrash}
+          onClose={() => setModal({ kind: "none" })}
+        />
+      )}
+
+      {/* Toast de deshacer tras mover a papelera */}
+      {undoToast && (
+        <div className="fixed inset-x-0 bottom-6 z-50 flex justify-center pointer-events-none">
+          <div className="pointer-events-auto flex items-center gap-3 rounded-2xl bg-zinc-800/95 px-5 py-3 ring-1 ring-white/10 shadow-xl backdrop-blur-sm">
+            <span className="text-sm text-zinc-200">
+              Movido a la papelera
+            </span>
+            <button
+              onClick={() => handleUndoTrash(undoToast.checkInId)}
+              className="rounded-full bg-lime-400 px-4 py-1.5 text-sm font-bold text-black transition active:scale-95"
+            >
+              Deshacer
+            </button>
+          </div>
+        </div>
       )}
 
       {modal.kind === "align" && alignData && (

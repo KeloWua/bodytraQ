@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import type { Settings, ViewProfile } from "@/lib/db";
+import type { Settings, ViewProfile, CheckIn } from "@/lib/db";
 import type { Quota } from "@/lib/storage";
 import { importBackup, exportBackup } from "@/lib/backup";
 import SecuritySection from "./SecuritySection";
@@ -56,6 +56,7 @@ export default function SettingsSheet({
   storageOk,
   quota,
   protection,
+  trashedCount,
   onLocked,
   onSecurityChanged,
   onChangeSettings,
@@ -65,12 +66,14 @@ export default function SettingsSheet({
   onEditGuides,
   onImported,
   onClose,
+  onOpenTrash,
 }: {
   settings: Settings;
   views: ViewProfile[];
   storageOk: boolean;
   quota: Quota | null;
   protection: boolean;
+  trashedCount: number;
   onLocked: () => void;
   onSecurityChanged: () => void;
   onChangeSettings: (patch: Partial<Settings>) => void;
@@ -80,6 +83,7 @@ export default function SettingsSheet({
   onEditGuides: (id: string) => void;
   onImported: () => void;
   onClose: () => void;
+  onOpenTrash: () => void;
 }) {
   const [newView, setNewView] = useState("");
   const [busy, setBusy] = useState(false);
@@ -90,14 +94,20 @@ export default function SettingsSheet({
     setBusy(true);
     setMessage(null);
     try {
-      const blob = await exportBackup();
+      const { blob, stats } = await exportBackup();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
       a.download = `bodytraq-backup-${new Date().toISOString().slice(0, 10)}.zip`;
       a.click();
       setTimeout(() => URL.revokeObjectURL(url), 10_000);
-      setMessage("Copia exportada.");
+      if (stats.trashedCheckInsExcluded > 0) {
+        setMessage(
+          `Copia exportada. Los ${stats.trashedCheckInsExcluded} elemento(s) en papelera no se incluirán en la copia.`
+        );
+      } else {
+        setMessage("Copia exportada.");
+      }
     } catch {
       setMessage("No se pudo exportar la copia.");
     } finally {
@@ -306,6 +316,25 @@ export default function SettingsSheet({
         </Section>
 
         <SecuritySection enabled={protection} onLocked={onLocked} onChanged={onSecurityChanged} />
+
+        <Section title="Papelera">
+          <button
+            onClick={onOpenTrash}
+            className="flex w-full items-center justify-between py-2.5 text-left"
+          >
+            <span className="text-sm text-zinc-200">
+              Registros en papelera
+              {trashedCount > 0 && (
+                <span className="ml-1.5 inline-block rounded-full bg-zinc-700 px-2 text-xs font-medium text-zinc-300">
+                  {trashedCount}
+                </span>
+              )}
+            </span>
+            <span className="text-xs text-zinc-500">
+              Se eliminan en 30 días
+            </span>
+          </button>
+        </Section>
 
         <Section title="Copia de seguridad">
           <p className="mb-3 text-xs leading-relaxed text-zinc-400">

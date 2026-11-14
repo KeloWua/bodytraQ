@@ -14,6 +14,7 @@ import {
   IconGuides,
   IconPencil,
   IconPlus,
+  IconTrash,
 } from "./icons";
 
 function parseGuides(json: string) {
@@ -39,6 +40,7 @@ export default function Timeline({
   onEditPhoto,
   onNewCheckIn,
   onEditCheckIn,
+  onMoveToTrash,
   onOpenSettings,
   refreshKey,
 }: {
@@ -52,6 +54,7 @@ export default function Timeline({
   onEditPhoto: (photo: Photo) => void;
   onNewCheckIn: () => void;
   onEditCheckIn: () => void;
+  onMoveToTrash: (id: string) => void;
   onOpenSettings: () => void;
   refreshKey: number;
 }) {
@@ -191,6 +194,17 @@ export default function Timeline({
             >
               <IconPencil className="h-3.5 w-3.5" />
               Editar
+            </button>
+            <button
+              onClick={() => {
+                if (current && window.confirm("¿Mover este registro a la papelera?")) {
+                  onMoveToTrash(current.id);
+                }
+              }}
+              className="flex items-center gap-1.5 rounded-full bg-zinc-900 px-3.5 py-2 text-xs font-medium text-red-300 ring-1 ring-white/10 transition active:scale-95"
+            >
+              <IconTrash className="h-3.5 w-3.5" />
+              Papelera
             </button>
             <button
               onClick={onOpenSettings}

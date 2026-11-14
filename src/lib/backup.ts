@@ -30,16 +30,34 @@ function photoPaths(p: Photo): string[] {
   return out;
 }
 
-export async function exportBackup(): Promise<Blob> {
+export interface ExportStats {
+  trashedCheckInsExcluded: number;
+  trashedPhotosExcluded: number;
+}
+
+export async function exportBackup(): Promise<{ blob: Blob; stats: ExportStats }> {
+  const allCheckIns = await db.check_ins.toArray();
+  const allPhotos = await db.photos.toArray();
+
+  // Excluir filas con deleted_at (papelera).
+  const activeCheckIns = allCheckIns.filter((c) => !c.deleted_at);
+  const activePhotos = allPhotos.filter((p) => !p.deleted_at);
+
   const data: BackupData = {
     schema_version: SCHEMA_VERSION,
     exported_at: new Date().toISOString(),
     settings: await db.settings.toArray(),
     view_profiles: await db.view_profiles.toArray(),
-    check_ins: await db.check_ins.toArray(),
-    photos: await db.photos.toArray(),
+    check_ins: activeCheckIns,
+    photos: activePhotos,
     meta: await db.meta.toArray(),
   };
+
+  const stats: ExportStats = {
+    trashedCheckInsExcluded: allCheckIns.length - activeCheckIns.length,
+    trashedPhotosExcluded: allPhotos.length - activePhotos.length,
+  };
+
   const zip = new JSZip();
   zip.file(JSON_NAME, JSON.stringify(data, null, 2));
   const seen = new Set<string>();
@@ -51,7 +69,7 @@ export async function exportBackup(): Promise<Blob> {
       if (blob) zip.file(FILES_DIR + path, blob);
     }
   }
-  return zip.generateAsync({ type: "blob" });
+  return { blob: await zip.generateAsync({ type: "blob" }), stats };
 }
 
 export interface ImportResult {

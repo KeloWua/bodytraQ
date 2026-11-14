@@ -26,7 +26,8 @@ export interface ViewProfile {
 
 export interface CheckIn {
   id: string;
-  date: string; // YYYY-MM-DD, unico
+  date: string; // YYYY-MM-DD, sin unicidad (active_key la proporciona)
+  active_key: string; // para activos = date; para papelera = `${date}#deleted#${id}`
   weight_kg: number | null;
   notes: string;
   created_at: string;
@@ -58,7 +59,14 @@ export interface Stroke {
   points: [number, number][]; // coordenadas normalizadas 0.0 a 1.0
 }
 
-export const SCHEMA_VERSION = 1;
+// Cola de borrado de archivos OPFS pendiente (drenada al arrancar).
+export interface PendingFileDeletion {
+  id: string;
+  paths: string[];
+  enqueued_at: string;
+}
+
+export const SCHEMA_VERSION = 2;
 
 // Tabla meta: pares clave/valor internos de la app (p. ej. la sal y el
 // verificador de la proteccion con contrasena). No contiene datos del usuario.
@@ -73,6 +81,7 @@ const db = new Dexie("bodytraq") as Dexie & {
   check_ins: EntityTable<CheckIn, "id">;
   photos: EntityTable<Photo, "id">;
   meta: EntityTable<MetaRow, "id">;
+  pendingFileDeletions: EntityTable<PendingFileDeletion, "id">;
 };
 
 db.version(1).stores({
@@ -88,6 +97,29 @@ db.version(1).stores({
 // v2: solo anade la tabla meta; los datos existentes no cambian.
 db.version(2).stores({
   meta: "id",
+});
+
+// v3: papelera con active_key unico para registros activos, tabla outbox para
+// borrado diferido de archivos OPFS. date ya no es unico ni clave primaria.
+db.version(3).stores({
+  settings: "id",
+  view_profiles: "id, order, deleted_at",
+  check_ins: "id, date, &active_key, deleted_at",
+  photos: "id, check_in_id, view_profile_id, [check_in_id+view_profile_id], deleted_at",
+  meta: "id",
+  pendingFileDeletions: "id, enqueued_at",
+}).upgrade(async (tx) => {
+  // Migrar check_ins: calcular active_key a partir de date y deleted_at.
+  const rows = await tx.table<CheckIn>("check_ins").toArray();
+  if (rows.length === 0) return;
+  for (const row of rows) {
+    if (row.deleted_at) {
+      row.active_key = `${row.date}#deleted#${row.id}`;
+    } else {
+      row.active_key = row.date;
+    }
+  }
+  await tx.table<CheckIn>("check_ins").bulkPut(rows);
 });
 
 export function defaultSettings(): Settings {
@@ -160,6 +192,8 @@ export async function activeViews(): Promise<ViewProfile[]> {
 }
 
 export async function listCheckIns(): Promise<CheckIn[]> {
+  // Solo registros activos (sin deleted_at). Con active_key, no hay riesgo
+  // de colision: cada activo tiene active_key = date, unico por indice.
   const all = (await db.check_ins.toArray()).filter((c) => !c.deleted_at);
   const { unsealText } = await import("./crypto");
   const out: CheckIn[] = [];
@@ -174,9 +208,13 @@ export async function upsertCheckIn(
 ): Promise<CheckIn> {
   const { sealText } = await import("./crypto");
   const notes = await sealText(notesPlain);
-  const existing = await db.check_ins.get({ date });
   const ts = nowISO();
-  if (existing && !existing.deleted_at) {
+
+  // Busca la fila activa con esta fecha por active_key (unico).
+  const existing = await db.check_ins.get({ active_key: date });
+
+  if (existing) {
+    // Actualiza la fila activa existente.
     await db.check_ins.update(existing.id, {
       weight_kg: weightKg,
       notes,
@@ -184,26 +222,40 @@ export async function upsertCheckIn(
     });
     return { ...existing, weight_kg: weightKg, notes: notesPlain, updated_at: ts };
   }
-  if (existing && existing.deleted_at) {
-    // Reutiliza la fila borrada para no violar el indice unico de fecha.
-    await db.check_ins.update(existing.id, {
-      weight_kg: weightKg,
-      notes,
-      updated_at: ts,
-      deleted_at: null,
-    });
-    return { ...existing, weight_kg: weightKg, notes: notesPlain, updated_at: ts, deleted_at: null };
-  }
+
+  // No hay activo para esta fecha: crea uno nuevo. Si hay un borrado con
+  // esta fecha, no importa: active_key=fecha no colisiona porque el borrado
+  // tiene active_key = `${date}#deleted#${id}`.
   const row: CheckIn = {
     id: uuid(),
     date,
+    active_key: date,
     weight_kg: weightKg,
     notes,
     created_at: ts,
     updated_at: ts,
     deleted_at: null,
   };
-  await db.check_ins.add(row);
+
+  try {
+    await db.check_ins.add(row);
+  } catch (e: any) {
+    // ConstraintError: dos pestanas escribieron la misma fecha a la vez.
+    // Relee la fila activa ganadora y aplica update sobre ella.
+    if (e?.name === "ConstraintError") {
+      const winner = await db.check_ins.get({ active_key: date });
+      if (winner) {
+        await db.check_ins.update(winner.id, {
+          weight_kg: weightKg,
+          notes,
+          updated_at: nowISO(),
+        });
+        return { ...winner, weight_kg: weightKg, notes: notesPlain, updated_at: nowISO() };
+      }
+    }
+    throw e;
+  }
+
   return { ...row, notes: notesPlain };
 }
 
@@ -233,6 +285,187 @@ export async function photoOf(checkInId: string, viewId: string): Promise<Photo 
     .equals([checkInId, viewId])
     .filter((p) => !p.deleted_at)
     .first();
+}
+
+// --- Papelera ----------------------------------------------------------------
+
+// Devuelve las rutas de archivos OPFS de todas las fotos de un registro.
+export function photosOfCheckInPaths(photos: Photo[]): string[] {
+  const paths: string[] = [];
+  for (const p of photos) {
+    paths.push(p.display_path, p.thumb_path);
+    if (p.original_path) paths.push(p.original_path);
+  }
+  return paths;
+}
+
+// Lista los registros en papelera (con deleted_at), ordenados por fecha de
+// borrado descendente (los mas recientes primero).
+export async function listTrashed(): Promise<CheckIn[]> {
+  const all = (await db.check_ins.toArray()).filter((c) => !!c.deleted_at);
+  const { unsealText } = await import("./crypto");
+  const out: CheckIn[] = [];
+  for (const c of all) out.push({ ...c, notes: await unsealText(c.notes) });
+  return out.sort((a, b) => (b.deleted_at ?? "").localeCompare(a.deleted_at ?? ""));
+}
+
+// Mueve un registro activo a la papelera: marca deleted_at, cambia active_key
+// para liberar la fecha, y marca las fotos asociadas como borradas.
+export async function moveToTrash(checkInId: string): Promise<void> {
+  const ts = nowISO();
+  await db.transaction("rw", db.check_ins, db.photos, async () => {
+    const row = await db.check_ins.get(checkInId);
+    if (!row || row.deleted_at) return;
+    // Cambia active_key para liberar la fecha (unico para activos).
+    const trashedKey = `${row.date}#deleted#${row.id}`;
+    await db.check_ins.update(row.id, {
+      active_key: trashedKey,
+      deleted_at: ts,
+      updated_at: ts,
+    });
+    // Marca fotos como borradas logicamente (los archivos se borran despues).
+    const photos = await db.photos
+      .where("check_in_id")
+      .equals(checkInId)
+      .filter((p) => !p.deleted_at)
+      .toArray();
+    for (const p of photos) {
+      await db.photos.update(p.id, { deleted_at: ts, updated_at: ts });
+    }
+  });
+}
+
+// Restaura un registro de la papelera. Si ya existe un activo con esa fecha,
+// devuelve { conflict: true } para que la UI decida que hacer.
+export async function restoreCheckIn(checkInId: string): Promise<{ ok: boolean; conflict?: boolean }> {
+  const row = await db.check_ins.get(checkInId);
+  if (!row || !row.deleted_at) return { ok: false };
+
+  // Verifica si ya hay un activo con esta fecha.
+  const existing = await db.check_ins.get({ active_key: row.date });
+  if (existing) return { ok: false, conflict: true };
+
+  const ts = nowISO();
+  await db.transaction("rw", db.check_ins, db.photos, async () => {
+    // Restaura active_key a la fecha original.
+    await db.check_ins.update(row.id, {
+      active_key: row.date,
+      deleted_at: null,
+      updated_at: ts,
+    });
+    // Restaura fotos asociadas.
+    const photos = await db.photos
+      .where("check_in_id")
+      .equals(checkInId)
+      .filter((p) => !!p.deleted_at)
+      .toArray();
+    for (const p of photos) {
+      await db.photos.update(p.id, { deleted_at: null, updated_at: ts });
+    }
+  });
+
+  return { ok: true };
+}
+
+// Elimina definitivamente un registro de la papelera: borra filas y encola
+// rutas de fotos en outbox para borrado OPFS diferido.
+export async function deleteForever(checkInId: string): Promise<void> {
+  await db.transaction("rw", db.check_ins, db.photos, db.pendingFileDeletions, async () => {
+    const row = await db.check_ins.get(checkInId);
+    if (!row) return;
+
+    // Recoge las rutas de fotos antes de borrar las filas.
+    const photos = await db.photos
+      .where("check_in_id")
+      .equals(checkInId)
+      .toArray();
+    const paths = photosOfCheckInPaths(photos);
+
+    // Borra fotos y registro.
+    await db.photos.where("check_in_id").equals(checkInId).delete();
+    await db.check_ins.delete(checkInId);
+
+    // Encola rutas para borrado OPFS diferido.
+    if (paths.length > 0) {
+      await db.pendingFileDeletions.add({
+        id: uuid(),
+        paths,
+        enqueued_at: nowISO(),
+      });
+    }
+  });
+}
+
+// Purga automatica: elimina los registros en papelera con mas de 30 dias.
+// Fase 1: transaccion Dexie (marca, encola, borra).
+// Fase 2: borrado OPFS idempotente.
+// Fase 3: limpieza de cola.
+// Solo usa metadatos no cifrados (deleted_at, fechas): no desencripta nada.
+export async function purgeExpired(): Promise<number> {
+  const now = Date.now();
+  const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
+
+  // Identifica los expirados (deleted_at > 30 dias).
+  const all = (await db.check_ins.toArray()).filter((c) => !!c.deleted_at);
+  const expired: CheckIn[] = [];
+  for (const c of all) {
+    const deletedDate = new Date(c.deleted_at!).getTime();
+    if (now - deletedDate >= thirtyDaysMs) {
+      expired.push(c);
+    }
+  }
+
+  if (expired.length === 0) return 0;
+
+  // Fase 1: transaccion Dexie — borra filas y encola rutas OPFS.
+  await db.transaction("rw", db.check_ins, db.photos, db.pendingFileDeletions, async () => {
+    for (const row of expired) {
+      const photos = await db.photos
+        .where("check_in_id")
+        .equals(row.id)
+        .toArray();
+      const paths = photosOfCheckInPaths(photos);
+      await db.photos.where("check_in_id").equals(row.id).delete();
+      await db.check_ins.delete(row.id);
+      if (paths.length > 0) {
+        await db.pendingFileDeletions.add({
+          id: uuid(),
+          paths,
+          enqueued_at: nowISO(),
+        });
+      }
+    }
+  });
+
+  // Fase 2 y 3: drenar outbox (incluye los nuevos items de esta purga).
+  await drainOutbox();
+
+  return expired.length;
+}
+
+// Drena la cola de borrado de archivos OPFS pendiente. Se ejecuta al arrancar
+// SIEMPRE antes de purgar nuevos, para completar cualquier purga interrumpida.
+export async function drainOutbox(): Promise<void> {
+  const { deleteBlob, revokeUrl } = await import("./storage");
+
+  while (true) {
+    const pending = await db.pendingFileDeletions.toArray();
+    if (pending.length === 0) break;
+
+    const ids: string[] = [];
+    for (const item of pending) {
+      for (const path of item.paths) {
+        try {
+          await deleteBlob(path);
+          revokeUrl(path);
+        } catch {
+          // NotFound = exito: el archivo ya no existe.
+        }
+      }
+      ids.push(item.id);
+    }
+    await db.pendingFileDeletions.bulkDelete(ids);
+  }
 }
 
 export default db;
