@@ -338,7 +338,8 @@ export default function SettingsSheet({
 
         <Section title="Copia de seguridad">
           <p className="mb-3 text-xs leading-relaxed text-zinc-400">
-            Exporta un ZIP con todas las fotos y la base de datos. Guárdalo fuera del
+            Exporta un ZIP con tus fotos y la base de datos (lo que esté en la
+            papelera no se incluye). Guárdalo fuera del
             dispositivo: el navegador puede purgar el almacenamiento local.{" "}
             {protection
               ? "La copia va cifrada con tu contraseña (se abre con ella al importarla)."
