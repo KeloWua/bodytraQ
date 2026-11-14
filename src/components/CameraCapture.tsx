@@ -158,6 +158,16 @@ export default function CameraCapture({
     return () => clearTimeout(id);
   }, [countdown]);
 
+  // Si la app pasa a segundo plano con la cuenta atras en marcha, se
+  // cancela: una foto disparada con la app oculta seria inesperada.
+  useEffect(() => {
+    const onVis = () => {
+      if (document.hidden) setCountdown(null);
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, []);
+
   function cancelCountdown() {
     setCountdown(null);
   }
