@@ -4,11 +4,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { Stroke } from "@/lib/db";
 import { GuideLayer } from "./AlignedPhoto";
 import { useFrame34 } from "@/lib/useFrame34";
-import { IconCamera, IconGuides, IconRotate, IconX } from "./icons";
+import { IconCamera, IconGuides, IconRotate, IconTimer, IconX } from "./icons";
 
 type Facing = "environment" | "user";
 
 type CamError = "denied" | "unavailable" | "other";
+
+const TIMER_OPTIONS = [0, 3, 10] as const;
+type TimerSec = (typeof TIMER_OPTIONS)[number];
 
 // Camara en directo con las guias del perfil dibujadas encima (overlay SVG).
 // La captura recorta el fotograma al mismo marco 3:4 que ve el usuario, de
@@ -32,6 +35,8 @@ export default function CameraCapture({
   const [error, setError] = useState<CamError | null>(null);
   const [showGuides, setShowGuides] = useState(true);
   const [capturing, setCapturing] = useState(false);
+  const [timerSec, setTimerSec] = useState<TimerSec>(0);
+  const [countdown, setCountdown] = useState<number | null>(null);
   const { boxRef, size } = useFrame34();
 
   const stopStream = useCallback(() => {
@@ -83,12 +88,7 @@ export default function CameraCapture({
     };
   }, [facing, stopStream]);
 
-  function handleCancel() {
-    stopStream();
-    onCancel();
-  }
-
-  async function handleCapture() {
+  async function takePhoto() {
     const v = videoRef.current;
     if (!v || !v.videoWidth || capturing) return;
     setCapturing(true);
@@ -137,6 +137,54 @@ export default function CameraCapture({
     }
   }
 
+  // La captura real va por ref para que la cuenta atras siempre llame a la
+  // version actual (facing/estado fresco) sin rehacer el temporizador.
+  const takePhotoRef = useRef<() => void>(() => undefined);
+  takePhotoRef.current = () => {
+    void takePhoto();
+  };
+
+  // La cuenta atras vive en un efecto: cada segundo baja un numero y al
+  // llegar a 0 dispara la captura. Cancelarla es ponerla a null, lo que
+  // limpia el timeout pendiente (tambien al desmontar el componente).
+  useEffect(() => {
+    if (countdown === null) return;
+    if (countdown <= 0) {
+      setCountdown(null);
+      takePhotoRef.current();
+      return;
+    }
+    const id = setTimeout(() => setCountdown((c) => (c === null ? null : c - 1)), 1000);
+    return () => clearTimeout(id);
+  }, [countdown]);
+
+  function cancelCountdown() {
+    setCountdown(null);
+  }
+
+  function handleCancel() {
+    cancelCountdown();
+    stopStream();
+    onCancel();
+  }
+
+  function handleRotate() {
+    // Girar la camara cancela cualquier cuenta atras en curso: nada de
+    // fotos inesperadas mientras el usuario reencuadra.
+    cancelCountdown();
+    setFacing((f) => (f === "environment" ? "user" : "environment"));
+  }
+
+  function handleShutter() {
+    if (countdown !== null) {
+      // Pulsar el disparador durante la cuenta atras la cancela.
+      cancelCountdown();
+      return;
+    }
+    if (timerSec > 0) setCountdown(timerSec);
+    else void takePhoto();
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-black">
       <div className="flex items-center justify-between px-3 py-3">
@@ -152,7 +200,7 @@ export default function CameraCapture({
           <div className="truncate text-[11px] text-zinc-500">Encuadra dentro de las líneas</div>
         </div>
         <button
-          onClick={() => setFacing((f) => (f === "environment" ? "user" : "environment"))}
+          onClick={handleRotate}
           aria-label="Cambiar de cámara"
           className="flex h-10 w-10 items-center justify-center rounded-full bg-zinc-900 text-zinc-300 ring-1 ring-white/10 transition active:scale-95"
         >
@@ -197,6 +245,19 @@ export default function CameraCapture({
                 }`}
               />
               {showGuides && <GuideLayer strokes={guides} />}
+              {countdown !== null && (
+                <button
+                  type="button"
+                  onClick={cancelCountdown}
+                  aria-label="Cancelar cuenta atrás"
+                  className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-black/40"
+                >
+                  <span className="text-7xl font-bold tabular-nums text-white drop-shadow-lg">
+                    {countdown}
+                  </span>
+                  <span className="text-xs font-medium text-zinc-200">Toca para cancelar</span>
+                </button>
+              )}
             </>
           )}
         </div>
@@ -214,16 +275,42 @@ export default function CameraCapture({
             <IconGuides className="h-3.5 w-3.5" />
             Guías
           </button>
-          <button
-            onClick={handleCapture}
-            disabled={Boolean(error) || capturing}
-            aria-label="Capturar foto"
-            className="flex h-14 flex-1 items-center justify-center gap-2 rounded-full bg-lime-400 text-sm font-bold text-black shadow-lg shadow-lime-400/25 transition active:scale-95 disabled:opacity-40"
+          <div
+            role="group"
+            aria-label="Temporizador"
+            className="flex flex-1 items-center justify-center gap-1 rounded-full bg-zinc-800 p-1 ring-1 ring-white/10"
           >
-            <IconCamera className="h-5 w-5" />
-            {capturing ? "Capturando…" : "Capturar"}
-          </button>
+            <IconTimer className="ml-1 h-3.5 w-3.5 shrink-0 text-zinc-500" />
+            {TIMER_OPTIONS.map((s) => (
+              <button
+                key={s}
+                type="button"
+                disabled={countdown !== null}
+                onClick={() => setTimerSec(s)}
+                aria-label={s === 0 ? "Sin temporizador" : `Temporizador de ${s} segundos`}
+                aria-pressed={timerSec === s}
+                className={`rounded-full px-3 py-1.5 text-xs font-semibold transition active:scale-95 disabled:opacity-40 ${
+                  timerSec === s ? "bg-zinc-700 text-lime-300" : "text-zinc-500"
+                }`}
+              >
+                {`${s}s`}
+              </button>
+            ))}
+          </div>
         </div>
+        <button
+          onClick={handleShutter}
+          disabled={Boolean(error) || capturing}
+          aria-label={countdown !== null ? "Cancelar cuenta atrás" : "Capturar foto"}
+          className={`flex h-14 w-full items-center justify-center gap-2 rounded-full text-sm font-bold transition active:scale-95 disabled:opacity-40 ${
+            countdown !== null
+              ? "bg-zinc-800 text-zinc-100 ring-1 ring-white/15"
+              : "bg-lime-400 text-black shadow-lg shadow-lime-400/25"
+          }`}
+        >
+          <IconCamera className="h-5 w-5" />
+          {countdown !== null ? `Cancelar (${countdown})` : capturing ? "Capturando…" : "Capturar"}
+        </button>
         <p className="text-center text-[11px] text-zinc-500">
           La foto se recorta al marco y luego puedes reajustarla como siempre.
         </p>
