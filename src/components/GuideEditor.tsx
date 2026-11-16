@@ -1,7 +1,8 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import AlignedPhoto, { GuideLayer, type PhotoTransform } from "./AlignedPhoto";
+import { processImageFile } from "@/lib/images";
 import { useFrame34 } from "@/lib/useFrame34";
 import type { Stroke } from "@/lib/db";
 import { IconBrush, IconCheck, IconLine, IconPhoto, IconTrash, IconUndo, IconX } from "./icons";
@@ -81,6 +82,37 @@ export default function GuideEditor({
     });
   }
 
+  // Foto base temporal: solo memoria del editor, nunca OPFS ni registro.
+  const [temporaryBase, setTemporaryBase] = useState<{ url: string; transform: PhotoTransform } | null>(null);
+  const [baseError, setBaseError] = useState("");
+  const [loadingBase, setLoadingBase] = useState(false);
+  const temporaryUrl = useRef<string | null>(null);
+  const alive = useRef(true);
+  const baseInput = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+      if (temporaryUrl.current) URL.revokeObjectURL(temporaryUrl.current);
+    };
+  }, []);
+  const baseUrl = temporaryBase?.url ?? backdropUrl;
+  const baseTransform = temporaryBase?.transform ?? backdropTransform;
+  async function chooseBase(file: File) {
+    setLoadingBase(true);
+    setBaseError("");
+    try {
+      const image = await processImageFile(file);
+      if (!alive.current) return;
+      const url = URL.createObjectURL(image.display);
+      if (temporaryUrl.current) URL.revokeObjectURL(temporaryUrl.current);
+      temporaryUrl.current = url;
+      setTemporaryBase({ url, transform: { width: image.width, height: image.height, scale: 1, rotation: 0, offset_x: 0, offset_y: 0 } });
+      setShowBackdrop(true);
+    } catch {
+      if (alive.current) setBaseError("No se pudo abrir esa imagen. Prueba con una foto JPG o PNG.");
+    } finally { if (alive.current) setLoadingBase(false); }
+  }
   const shown = draft ? [...strokes, draft] : strokes;
 
   return (
@@ -98,6 +130,7 @@ export default function GuideEditor({
           <div className="truncate text-[11px] text-zinc-500">Dibuja líneas de referencia</div>
         </div>
         <button
+          disabled={loadingBase}
           onClick={() => onSave(strokes)}
           className="flex h-11 items-center gap-1.5 rounded-full bg-lime-400 px-4 text-sm font-bold text-black shadow-lg shadow-lime-400/25 transition active:scale-95"
         >
@@ -106,6 +139,19 @@ export default function GuideEditor({
         </button>
       </div>
 
+      {initial.length === 0 && (
+        <div className="mx-3 rounded-xl bg-zinc-900 px-3 py-2 text-xs text-zinc-300">
+          <button disabled={loadingBase} onClick={() => baseInput.current?.click()} className="min-h-11 rounded-full bg-zinc-800 px-4 font-semibold text-lime-300">
+            {loadingBase ? "Abriendo foto…" : temporaryBase ? "Cambiar foto base temporal" : "Elegir foto base para la primera guía"}
+          </button>
+          <p className="mt-1">Dibuja sobre una foto. Al guardar quedan solo las líneas: este fondo no se añade al seguimiento ni modifica el original.</p>
+          {baseError && <p role="alert" className="mt-1 text-amber-300">{baseError}</p>}
+          <input ref={baseInput} type="file" accept="image/*,.heic,.heif" className="hidden" aria-label="Foto base temporal" onChange={(e) => {
+            const file = e.target.files?.[0]; e.target.value = "";
+            if (file) void chooseBase(file);
+          }} />
+        </div>
+      )}
       <div ref={boxRef} className="flex min-h-0 flex-1 items-center justify-center overflow-hidden p-4">
         <div
           ref={frameRef}
@@ -116,8 +162,8 @@ export default function GuideEditor({
           onPointerUp={onPointerUp}
           onPointerCancel={onPointerUp}
         >
-          {showBackdrop && backdropUrl && backdropTransform ? (
-            <AlignedPhoto srcUrl={backdropUrl} transform={backdropTransform} />
+          {showBackdrop && baseUrl && baseTransform ? (
+            <AlignedPhoto srcUrl={baseUrl} transform={baseTransform} />
           ) : (
             <div className="h-full w-full rounded-2xl bg-zinc-900 ring-1 ring-white/10" />
           )}
@@ -163,7 +209,7 @@ export default function GuideEditor({
             <IconTrash className="h-3.5 w-3.5" />
             Borrar todo
           </button>
-          {backdropUrl && (
+          {baseUrl && (
             <button
               onClick={() => setShowBackdrop((v) => !v)}
               className={`flex flex-1 items-center justify-center gap-1 whitespace-nowrap rounded-full py-2.5 text-xs font-medium ring-1 ring-white/10 transition active:scale-95 ${
