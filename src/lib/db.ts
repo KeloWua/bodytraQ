@@ -1,5 +1,5 @@
 import Dexie, { type EntityTable } from "dexie";
-import { nowISO, uuid } from "./utils";
+import { nowISO, todayISO, uuid } from "./utils";
 
 export interface Settings {
   id: string; // siempre 'current'
@@ -201,62 +201,46 @@ export async function listCheckIns(): Promise<CheckIn[]> {
   return out.sort((a, b) => a.date.localeCompare(b.date));
 }
 
+// Creacion y edicion explicitas: nunca convertir un alta en una actualizacion.
 export async function upsertCheckIn(
   date: string,
   weightKg: number | null,
   notesPlain: string,
+  editingId?: string,
 ): Promise<CheckIn> {
+  const parsed = new Date(`${date}T12:00:00`);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(parsed.getTime()) ||
+      `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, "0")}-${String(parsed.getDate()).padStart(2, "0")}` !== date) {
+    throw new Error("Elige una fecha válida.");
+  }
+  if (!editingId && date > todayISO()) throw new Error("No puedes crear registros en el futuro.");
   const { sealText } = await import("./crypto");
   const notes = await sealText(notesPlain);
   const ts = nowISO();
-
-  // Busca la fila activa con esta fecha por active_key (unico).
-  const existing = await db.check_ins.get({ active_key: date });
-
-  if (existing) {
-    // Actualiza la fila activa existente.
-    await db.check_ins.update(existing.id, {
-      weight_kg: weightKg,
-      notes,
-      updated_at: ts,
-    });
-    return { ...existing, weight_kg: weightKg, notes: notesPlain, updated_at: ts };
-  }
-
-  // No hay activo para esta fecha: crea uno nuevo. Si hay un borrado con
-  // esta fecha, no importa: active_key=fecha no colisiona porque el borrado
-  // tiene active_key = `${date}#deleted#${id}`.
-  const row: CheckIn = {
-    id: uuid(),
-    date,
-    active_key: date,
-    weight_kg: weightKg,
-    notes,
-    created_at: ts,
-    updated_at: ts,
-    deleted_at: null,
-  };
-
-  try {
-    await db.check_ins.add(row);
-  } catch (e: any) {
-    // ConstraintError: dos pestanas escribieron la misma fecha a la vez.
-    // Relee la fila activa ganadora y aplica update sobre ella.
-    if (e?.name === "ConstraintError") {
-      const winner = await db.check_ins.get({ active_key: date });
-      if (winner) {
-        await db.check_ins.update(winner.id, {
-          weight_kg: weightKg,
-          notes,
-          updated_at: nowISO(),
-        });
-        return { ...winner, weight_kg: weightKg, notes: notesPlain, updated_at: nowISO() };
-      }
+  return db.transaction("rw", db.check_ins, db.photos, async () => {
+    if (editingId) {
+      const row = await db.check_ins.get(editingId);
+      if (!row || row.deleted_at) throw new Error("Este registro ya no está disponible. Cierra y vuelve a abrirlo.");
+      if (row.date !== date) throw new Error("La fecha no se cambia al editar. Crea otro registro para otro día.");
+      await db.check_ins.update(row.id, { weight_kg: weightKg, notes, updated_at: ts });
+      return { ...row, weight_kg: weightKg, notes: notesPlain, updated_at: ts };
     }
-    throw e;
-  }
-
-  return { ...row, notes: notesPlain };
+    const existing = await db.check_ins.get({ active_key: date });
+    if (existing) {
+      const photo = await db.photos.where("check_in_id").equals(existing.id).filter((p) => !p.deleted_at).first();
+      throw new Error(photo
+        ? "Ya tienes fotos de ese día. Abre ese registro para editarlo o añadir otra vista. No se ha cambiado nada."
+        : "Ya tienes un registro de ese día. Ábrelo para editarlo o añadir fotos. No se ha cambiado nada.");
+    }
+    const row: CheckIn = {
+      id: uuid(), date, active_key: date, weight_kg: weightKg, notes,
+      created_at: ts, updated_at: ts, deleted_at: null,
+    };
+    // La transaccion serializa altas simultaneas; el indice unico es otra
+    // barrera. Nunca actualizar la fila ganadora de otra pestana.
+    await db.check_ins.add(row);
+    return { ...row, notes: notesPlain };
+  });
 }
 
 export async function photosOf(checkInId: string): Promise<Photo[]> {
