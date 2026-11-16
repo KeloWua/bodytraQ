@@ -687,7 +687,7 @@ function TutorialVideo({ onClose }: { onClose: () => void }) {
     </header>
     <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden">
       {failed ? <p role="alert" className="max-w-sm p-6 text-sm text-zinc-300">No se ha podido cargar el vídeo. Puedes continuar y volver a intentarlo desde Ajustes.</p> :
-        <video aria-label="Tutorial para crear guías y tu primer registro" src="/1-bodytraq-tutorial-test.mp4" controls autoPlay muted playsInline preload="metadata" onError={() => setFailed(true)} className="h-full min-h-0 max-w-full object-contain" />}
+        <video aria-label="Tutorial para crear guías y tu primer registro" src="/2-bodytraq-tutorial-safe.mp4" controls autoPlay muted playsInline preload="metadata" onError={() => setFailed(true)} className="h-full min-h-0 max-w-full object-contain" />}
     </div>
     <footer className="flex shrink-0 items-center justify-center gap-3 px-4 py-2 pb-[max(.5rem,env(safe-area-inset-bottom))]">
       <p className="max-w-48 text-xs text-zinc-400">Puedes volver a verlo en Ajustes.</p>
