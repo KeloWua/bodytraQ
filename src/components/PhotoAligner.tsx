@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import AlignedPhoto, { type PhotoTransform } from "./AlignedPhoto";
+import AlignedPhoto, { GhostPhoto, type PhotoTransform } from "./AlignedPhoto";
 import type { Stroke } from "@/lib/db";
 import { clamp } from "@/lib/utils";
 import { useFrame34 } from "@/lib/useFrame34";
-import { IconCheck, IconGuides, IconRotate, IconUndo, IconX } from "./icons";
+import { listGuidePhotos, type GuidePhoto } from "@/lib/guidePhotos";
+import { objectUrl } from "@/lib/storage";
+import { IconCheck, IconGuides, IconPhoto, IconRotate, IconUndo, IconX } from "./icons";
 
 interface P {
   x: number;
@@ -21,6 +23,7 @@ export default function PhotoAligner({
   baseHeight,
   initial,
   guides,
+  viewId,
   onSave,
   onCancel,
 }: {
@@ -29,6 +32,7 @@ export default function PhotoAligner({
   baseHeight: number;
   initial?: Partial<PhotoTransform>;
   guides: Stroke[];
+  viewId: string;
   onSave: (t: { scale: number; rotation: number; offset_x: number; offset_y: number }) => void;
   onCancel: () => void;
 }) {
@@ -37,6 +41,35 @@ export default function PhotoAligner({
   const [offsetX, setOffsetX] = useState(initial?.offset_x ?? 0);
   const [offsetY, setOffsetY] = useState(initial?.offset_y ?? 0);
   const [showGuides, setShowGuides] = useState(true);
+
+  // Foto guia (silueta): igual que en la camara. Se elige entre las fotos ya
+  // guardadas en este navegador; solo se lee, no se copia ni se cambia nada,
+  // y nunca forma parte de la foto que se guarda.
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [options, setOptions] = useState<GuidePhoto[] | null>(null);
+  const [thumbs, setThumbs] = useState<Record<string, string | null>>({});
+  const [ref, setRef] = useState<{ gp: GuidePhoto; url: string } | null>(null);
+  const [refVisible, setRefVisible] = useState(true);
+  const [refOpacity, setRefOpacity] = useState(0.4);
+
+  async function openPicker() {
+    setPickerOpen(true);
+    const list = await listGuidePhotos(viewId);
+    setOptions(list);
+    const entries = await Promise.all(
+      list.map(async (g) => [g.photo.id, await objectUrl(g.photo.thumb_path)] as const),
+    );
+    setThumbs(Object.fromEntries(entries));
+  }
+
+  async function chooseRef(g: GuidePhoto) {
+    const url = await objectUrl(g.photo.display_path);
+    if (url) {
+      setRef({ gp: g, url });
+      setRefVisible(true);
+    }
+    setPickerOpen(false);
+  }
 
   const frameRef = useRef<HTMLDivElement>(null);
   const { boxRef, size } = useFrame34();
@@ -135,7 +168,7 @@ export default function PhotoAligner({
       <div ref={boxRef} className="flex min-h-0 flex-1 items-center justify-center overflow-hidden p-4">
         <div
           ref={frameRef}
-          className="touch-none"
+          className="touch-none relative"
           style={{ width: size.w, height: size.h }}
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
@@ -156,6 +189,20 @@ export default function PhotoAligner({
               guides={guides}
               showGuides={showGuides}
             />
+            {ref && refVisible && (
+              <GhostPhoto
+                srcUrl={ref.url}
+                opacity={refOpacity}
+                transform={{
+                  width: ref.gp.photo.width,
+                  height: ref.gp.photo.height,
+                  scale: ref.gp.photo.scale,
+                  rotation: ref.gp.photo.rotation,
+                  offset_x: ref.gp.photo.offset_x,
+                  offset_y: ref.gp.photo.offset_y,
+                }}
+              />
+            )}
           </div>
         </div>
       </div>
@@ -173,6 +220,19 @@ export default function PhotoAligner({
             className="flex-1 accent-lime-400"
           />
           <span className="w-11 text-right tabular-nums">{scale.toFixed(2)}x</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => void openPicker()}
+            aria-label="Elegir foto guía"
+            className={`flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-full py-2.5 text-xs font-medium ring-1 ring-white/10 transition active:scale-95 ${
+              ref ? "bg-zinc-700 text-lime-300" : "bg-zinc-800 text-zinc-400"
+            }`}
+          >
+            <IconPhoto className="h-3.5 w-3.5" />
+            {ref ? `Foto guía: ${ref.gp.viewName} ${ref.gp.date}` : "Foto guía (foto anterior)"}
+          </button>
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -212,7 +272,90 @@ export default function PhotoAligner({
             Guías
           </button>
         </div>
+        {ref && (
+          <div className="flex items-center gap-2">
+            <span className="max-w-[45%] truncate text-[11px] text-zinc-500">
+              {ref.gp.viewName} · {ref.gp.date}
+            </span>
+            <button
+              type="button"
+              onClick={() => setRefVisible((v) => !v)}
+              aria-pressed={refVisible}
+              className={`min-h-11 flex-1 rounded-full px-3 text-xs font-medium ring-1 ring-white/10 transition active:scale-95 ${
+                refVisible ? "bg-zinc-700 text-lime-300" : "bg-zinc-800 text-zinc-500"
+              }`}
+            >
+              {refVisible ? "Ocultar" : "Mostrar"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setRef(null)}
+              className="min-h-11 flex-1 rounded-full bg-zinc-800 px-3 text-xs font-medium text-zinc-400 ring-1 ring-white/10 transition active:scale-95"
+            >
+              Quitar
+            </button>
+          </div>
+        )}
+        {ref && (
+          <label className="flex min-h-11 items-center gap-3 text-xs text-zinc-400">
+            Opacidad
+            <input
+              type="range"
+              min={10}
+              max={80}
+              step={5}
+              value={Math.round(refOpacity * 100)}
+              onChange={(e) => setRefOpacity(Number(e.target.value) / 100)}
+              aria-label="Opacidad de la foto guía"
+              className="flex-1 accent-lime-400"
+            />
+            <span className="w-9 text-right tabular-nums">{Math.round(refOpacity * 100)}%</span>
+          </label>
+        )}
       </div>
+      {pickerOpen && (
+        <div className="absolute inset-0 z-30 flex flex-col justify-end bg-black/70">
+          <div className="max-h-[70%] overflow-y-auto rounded-t-3xl bg-zinc-900 p-4 ring-1 ring-white/10">
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="text-sm font-semibold">Elige una foto como guía</h3>
+              <button
+                type="button"
+                onClick={() => setPickerOpen(false)}
+                aria-label="Cerrar selector"
+                className="flex h-11 w-11 items-center justify-center rounded-full bg-zinc-800 text-zinc-300 ring-1 ring-white/10"
+              >
+                <IconX className="h-4 w-4" />
+              </button>
+            </div>
+            {options === null ? (
+              <p className="py-6 text-center text-sm text-zinc-500">Cargando…</p>
+            ) : options.length === 0 ? (
+              <p className="py-6 text-center text-sm text-zinc-400">No hay fotos previas para usar como guía</p>
+            ) : (
+              <div className="grid grid-cols-3 gap-2">
+                {options.map((g) => (
+                  <button
+                    key={g.photo.id}
+                    type="button"
+                    onClick={() => void chooseRef(g)}
+                    aria-label={`Usar la foto ${g.viewName} del ${g.date} como guía`}
+                    className="flex flex-col items-center gap-1 rounded-xl p-1 ring-1 ring-white/10 active:scale-95"
+                  >
+                    {thumbs[g.photo.id] ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={thumbs[g.photo.id]!} alt="" className="aspect-[3/4] w-full rounded-lg object-cover" />
+                    ) : (
+                      <div className="aspect-[3/4] w-full rounded-lg bg-zinc-800" />
+                    )}
+                    <span className="max-w-full truncate text-[11px] text-zinc-400">{g.viewName}</span>
+                    <span className="text-[11px] text-zinc-500">{g.date}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
