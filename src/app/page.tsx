@@ -561,6 +561,7 @@ export default function Page() {
           baseWidth={alignData.width}
           baseHeight={alignData.height}
           guides={parseGuidesSafe(views.find((v) => v.id === modal.viewId)?.guides)}
+          viewId={modal.viewId}
           onSave={handleSaveAlign}
           onCancel={() => {
             URL.revokeObjectURL(alignData.previewUrl);
@@ -582,6 +583,7 @@ export default function Page() {
             offset_y: modal.photo.offset_y,
           }}
           guides={parseGuidesSafe(views.find((v) => v.id === modal.photo.view_profile_id)?.guides)}
+          viewId={modal.photo.view_profile_id}
           onSave={handleSaveRealign}
           onCancel={() => {
             URL.revokeObjectURL(realign.previewUrl);
