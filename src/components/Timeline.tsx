@@ -28,7 +28,10 @@ function parseGuides(json: string) {
 
 // Timeline: navega por fechas con flechas, teclado y swipe; muestra 1 o 2
 // vistas con la misma matematica 3:4 del editor; precarga fechas adyacentes
-// para que el timelapse no parpadee.
+// para que el timelapse no parpadee. El modo (1 o 2) solo fija cuantas
+// vistas se ven a la vez: en modo 1 la lista de vistas se desplaza en
+// horizontal y en modo 2 las flechas recorren todas las vistas por parejas,
+// asi ninguna vista queda fuera de alcance.
 export default function Timeline({
   settings,
   views,
@@ -60,6 +63,7 @@ export default function Timeline({
 }) {
   const [layout, setLayout] = useState(settings.default_layout);
   const [singleViewId, setSingleViewId] = useState<string | null>(null);
+  const [dualStart, setDualStart] = useState(0);
   const [photos, setPhotos] = useState<Map<string, Photo>>(new Map());
   const [urls, setUrls] = useState<Map<string, string>>(new Map());
   const [showGuides, setShowGuides] = useState(true);
@@ -67,11 +71,16 @@ export default function Timeline({
 
   const current: CheckIn | null = checkIns[index] ?? null;
 
+  // Ventana deslizante del modo 2: nunca deja fuera vistas del final;
+  // se clampa si se borran vistas para no quedar fuera de rango.
+  const maxDualStart = Math.max(0, views.length - 2);
+  const curDualStart = Math.min(dualStart, maxDualStart);
+
   const shownViews = useMemo(() => {
-    if (layout === "dual" && views.length >= 2) return views.slice(0, 2);
+    if (layout === "dual" && views.length >= 2) return views.slice(curDualStart, curDualStart + 2);
     const chosen = views.find((v) => v.id === singleViewId) ?? views[0];
     return chosen ? [chosen] : [];
-  }, [layout, views, singleViewId]);
+  }, [layout, views, singleViewId, curDualStart]);
 
   useEffect(() => {
     let cancelled = false;
@@ -234,7 +243,7 @@ export default function Timeline({
 
       <div className="flex items-center justify-center gap-2 px-3 pt-3 pb-1">
         {views.length > 1 && (
-          <div className="flex rounded-full bg-zinc-900 p-1 ring-1 ring-white/10">
+          <div className="flex shrink-0 rounded-full bg-zinc-900 p-1 ring-1 ring-white/10">
             {(["single", "dual"] as const).map((l, i) => (
               <button
                 key={l}
@@ -249,26 +258,55 @@ export default function Timeline({
           </div>
         )}
         {layout === "single" && views.length > 1 && (
-          <div className="flex rounded-full bg-zinc-900 p-1 ring-1 ring-white/10">
-            {views.map((v) => (
-              <button
-                key={v.id}
-                onClick={() => setSingleViewId(v.id)}
-                className={`min-h-11 rounded-full px-3.5 py-1.5 text-xs font-medium transition ${
-                  (singleViewId ?? views[0]?.id) === v.id
-                    ? "bg-lime-400 text-black"
-                    : "text-zinc-400"
-                }`}
-              >
-                {v.name}
-              </button>
-            ))}
+          // La fila de vistas se desplaza en horizontal: con muchas vistas
+          // ninguna queda cortada fuera de la pantalla.
+          <div className="flex min-w-0 flex-1 overflow-x-auto rounded-full bg-zinc-900 p-1 ring-1 ring-white/10 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <div className="m-auto flex">
+              {views.map((v) => (
+                <button
+                  key={v.id}
+                  onClick={() => setSingleViewId(v.id)}
+                  className={`min-h-11 shrink-0 rounded-full px-3.5 py-1.5 text-xs font-medium transition ${
+                    (singleViewId ?? views[0]?.id) === v.id
+                      ? "bg-lime-400 text-black"
+                      : "text-zinc-400"
+                  }`}
+                >
+                  {v.name}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+        {layout === "dual" && views.length > 2 && (
+          // Con mas de 2 vistas, las flechas recorren el catalogo por
+          // parejas: el modo 2 limita cuantas se ven a la vez, no cuales.
+          <div className="flex shrink-0 items-center rounded-full bg-zinc-900 p-1 ring-1 ring-white/10">
+            <button
+              onClick={() => setDualStart((s) => Math.max(0, s - 1))}
+              disabled={curDualStart <= 0}
+              aria-label="Vistas anteriores"
+              className="flex h-11 w-11 items-center justify-center rounded-full text-zinc-400 transition active:scale-95 disabled:opacity-30"
+            >
+              <IconChevronL />
+            </button>
+            <span className="px-1 text-xs font-medium text-zinc-400 tabular-nums">
+              {curDualStart + 1}-{Math.min(curDualStart + 2, views.length)}/{views.length}
+            </span>
+            <button
+              onClick={() => setDualStart((s) => Math.min(maxDualStart, s + 1))}
+              disabled={curDualStart >= maxDualStart}
+              aria-label="Vistas siguientes"
+              className="flex h-11 w-11 items-center justify-center rounded-full text-zinc-400 transition active:scale-95 disabled:opacity-30"
+            >
+              <IconChevronR />
+            </button>
           </div>
         )}
         <button
           onClick={() => setShowGuides((v) => !v)}
           aria-label="Guías"
-          className={`flex h-11 w-11 items-center justify-center rounded-full ring-1 ring-white/10 transition active:scale-95 ${
+          className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full ring-1 ring-white/10 transition active:scale-95 ${
             showGuides ? "bg-zinc-800 text-lime-400" : "bg-zinc-900 text-zinc-500"
           }`}
         >
