@@ -171,6 +171,11 @@ export default function Timeline({
       onPointerDown={(e) => {
         swipe.current = { x: e.clientX, y: e.clientY };
       }}
+      onPointerCancel={() => {
+        // Si el gesto acaba siendo scroll vertical, el navegador cancela el
+        // puntero: hay que olvidar el swipe para no navegar fechas despues.
+        swipe.current = null;
+      }}
       onPointerUp={(e) => {
         if (!swipe.current) return;
         const dx = e.clientX - swipe.current.x;
