@@ -157,7 +157,7 @@ export default function Timeline({
         <button
           onClick={onOpenSettings}
           aria-label="Ajustes"
-          className="text-sm text-zinc-400 underline underline-offset-4"
+          className="min-h-11 px-3 text-sm text-zinc-400 underline underline-offset-4"
         >
           Ajustes
         </button>
@@ -190,7 +190,7 @@ export default function Timeline({
           <div className="flex items-center gap-2">
             <button
               onClick={onEditCheckIn}
-              className="flex items-center gap-1.5 rounded-full bg-zinc-900 px-3.5 py-2 text-xs font-medium text-zinc-300 ring-1 ring-white/10 transition active:scale-95"
+              className="flex items-center gap-1.5 rounded-full bg-zinc-900 min-h-11 px-3.5 py-2 text-xs font-medium text-zinc-300 ring-1 ring-white/10 transition active:scale-95"
             >
               <IconPencil className="h-3.5 w-3.5" />
               Editar
@@ -201,7 +201,7 @@ export default function Timeline({
                   onMoveToTrash(current.id);
                 }
               }}
-              className="flex items-center gap-1.5 rounded-full bg-zinc-900 px-3.5 py-2 text-xs font-medium text-red-300 ring-1 ring-white/10 transition active:scale-95"
+              className="flex items-center gap-1.5 rounded-full bg-zinc-900 min-h-11 px-3.5 py-2 text-xs font-medium text-red-300 ring-1 ring-white/10 transition active:scale-95"
             >
               <IconTrash className="h-3.5 w-3.5" />
               Papelera
@@ -209,7 +209,7 @@ export default function Timeline({
             <button
               onClick={onOpenSettings}
               aria-label="Ajustes"
-              className="flex h-9 w-9 items-center justify-center rounded-full bg-zinc-900 text-zinc-300 ring-1 ring-white/10 transition active:scale-95"
+              className="flex h-11 w-11 items-center justify-center rounded-full bg-zinc-900 text-zinc-300 ring-1 ring-white/10 transition active:scale-95"
             >
               <IconGear className="h-4.5 w-4.5" />
             </button>
@@ -234,7 +234,7 @@ export default function Timeline({
               <button
                 key={l}
                 onClick={() => setLayout(l)}
-                className={`h-7 w-7 rounded-full text-xs font-semibold transition ${
+                className={`h-11 w-11 rounded-full text-xs font-semibold transition ${
                   layout === l ? "bg-lime-400 text-black" : "text-zinc-400"
                 }`}
               >
@@ -249,7 +249,7 @@ export default function Timeline({
               <button
                 key={v.id}
                 onClick={() => setSingleViewId(v.id)}
-                className={`rounded-full px-3 py-1.5 text-xs font-medium transition ${
+                className={`min-h-11 rounded-full px-3.5 py-1.5 text-xs font-medium transition ${
                   (singleViewId ?? views[0]?.id) === v.id
                     ? "bg-lime-400 text-black"
                     : "text-zinc-400"
@@ -263,7 +263,7 @@ export default function Timeline({
         <button
           onClick={() => setShowGuides((v) => !v)}
           aria-label="Guías"
-          className={`flex h-9 w-9 items-center justify-center rounded-full ring-1 ring-white/10 transition active:scale-95 ${
+          className={`flex h-11 w-11 items-center justify-center rounded-full ring-1 ring-white/10 transition active:scale-95 ${
             showGuides ? "bg-zinc-800 text-lime-400" : "bg-zinc-900 text-zinc-500"
           }`}
         >
@@ -307,7 +307,7 @@ export default function Timeline({
                   >
                     <IconCamera className={`h-8 w-8 ${storageOk ? "text-zinc-500" : "text-zinc-700"}`} />
                     <span className={`text-sm font-medium ${storageOk ? "text-lime-400" : "text-zinc-600"}`}>
-                      {storageOk ? "Añadir foto" : "Sin OPFS: fotos no disponibles"}
+                      {storageOk ? "Añadir foto" : "Fotos no disponibles (ver Ajustes)"}
                     </span>
                   </button>
                 }

@@ -47,7 +47,7 @@ export default function CheckInForm({
           type="date"
           value={date}
           onChange={(e) => setDate(e.target.value)}
-          className="mb-4 w-full rounded-xl bg-zinc-800/70 px-4 py-3 text-white ring-1 ring-white/10 outline-none focus:ring-lime-400"
+          className="mb-4 w-full min-h-11 rounded-xl bg-zinc-800/70 px-4 py-3 text-white ring-1 ring-white/10 outline-none focus:ring-lime-400"
         />
         <label className="mb-1.5 block text-[11px] font-medium tracking-widest text-zinc-500 uppercase">
           Peso ({unit})
@@ -60,7 +60,7 @@ export default function CheckInForm({
           value={weight}
           onChange={(e) => setWeight(e.target.value)}
           placeholder={unit === "lb" ? "176,4" : "80"}
-          className="mb-4 w-full rounded-xl bg-zinc-800/70 px-4 py-3 text-white ring-1 ring-white/10 outline-none focus:ring-lime-400"
+          className="mb-4 w-full min-h-11 rounded-xl bg-zinc-800/70 px-4 py-3 text-white ring-1 ring-white/10 outline-none focus:ring-lime-400"
         />
         <label className="mb-1.5 block text-[11px] font-medium tracking-widest text-zinc-500 uppercase">
           Notas (opcional)
@@ -69,7 +69,7 @@ export default function CheckInForm({
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
           rows={2}
-          className="mb-5 w-full rounded-xl bg-zinc-800/70 px-4 py-3 text-white ring-1 ring-white/10 outline-none focus:ring-lime-400"
+          className="mb-5 w-full min-h-11 rounded-xl bg-zinc-800/70 px-4 py-3 text-white ring-1 ring-white/10 outline-none focus:ring-lime-400"
         />
         <div className="flex gap-3">
           <button

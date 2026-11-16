@@ -1,5 +1,6 @@
 "use client";
 
+import { opfsReason } from "@/lib/storage";
 import { useRef, useState } from "react";
 import type { Settings, ViewProfile, CheckIn } from "@/lib/db";
 import type { Quota } from "@/lib/storage";
@@ -21,7 +22,7 @@ function Switch({
       role="switch"
       aria-checked={checked}
       onClick={() => onChange(!checked)}
-      className="flex w-full items-center justify-between py-2.5 text-left"
+      className="flex w-full items-center justify-between min-h-11 py-2.5 text-left"
     >
       <span className="text-sm text-zinc-200">{label}</span>
       <span
@@ -157,7 +158,7 @@ export default function SettingsSheet({
           <h2 className="text-lg font-bold tracking-tight">Ajustes</h2>
           <button
             onClick={onClose}
-            className="flex items-center gap-1.5 rounded-full bg-zinc-800 px-3.5 py-2 text-xs font-medium text-zinc-300 ring-1 ring-white/10 transition active:scale-95"
+            className="flex items-center gap-1.5 rounded-full bg-zinc-800 min-h-11 px-3.5 py-2 text-xs font-medium text-zinc-300 ring-1 ring-white/10 transition active:scale-95"
           >
             <IconX className="h-3.5 w-3.5" />
             Cerrar
@@ -166,9 +167,14 @@ export default function SettingsSheet({
 
         {!storageOk && (
           <div className="mb-4 rounded-2xl border border-red-500/40 bg-red-500/10 p-4 text-sm text-red-200">
-            Este navegador no tiene OPFS: las fotos NO se pueden guardar de forma duradera
-            aquí. La app no usará otro almacenamiento sin tu permiso. Usa un navegador
-            actual (Chrome, Edge, Firefox o Safari 15.2+).
+            Las fotos NO se pueden guardar de forma duradera aqui. La app no usara otro
+            almacenamiento sin tu permiso.{" "}
+            {opfsReason() === "sin-api" && "Este navegador no ofrece OPFS."}
+            {opfsReason() === "sin-escritura" &&
+              "Este navegador abre OPFS pero no permite escribir archivos desde la pagina (createWritable)."}
+            {opfsReason().startsWith("error-directorio") &&
+              "El navegador ha rechazado abrir OPFS (posible modo privado u otra restriccion)."}
+            {" "}Detalle tecnico: {opfsReason() || "desconocido"}.
           </div>
         )}
 
@@ -181,14 +187,14 @@ export default function SettingsSheet({
             onChange={(e) =>
               onChangeSettings({ height_cm: e.target.value === "" ? null : Number(e.target.value) })
             }
-            className="w-full rounded-xl bg-zinc-800/70 px-4 py-2.5 ring-1 ring-white/10 outline-none focus:ring-lime-400"
+            className="w-full rounded-xl bg-zinc-800/70 px-4 min-h-11 py-2.5 ring-1 ring-white/10 outline-none focus:ring-lime-400"
           />
           <div className="mt-3 flex rounded-full bg-zinc-800 p-1 ring-1 ring-white/10">
             {(["kg", "lb"] as const).map((u) => (
               <button
                 key={u}
                 onClick={() => onChangeSettings({ weight_unit: u })}
-                className={`flex-1 rounded-full py-2 text-sm font-semibold transition ${
+                className={`min-h-11 flex-1 rounded-full py-2 text-sm font-semibold transition ${
                   settings.weight_unit === u ? "bg-lime-400 text-black" : "text-zinc-400"
                 }`}
               >
@@ -204,7 +210,7 @@ export default function SettingsSheet({
               <button
                 key={l}
                 onClick={() => onChangeSettings({ default_layout: l })}
-                className={`flex-1 rounded-full py-2 text-sm font-semibold transition ${
+                className={`min-h-11 flex-1 rounded-full py-2 text-sm font-semibold transition ${
                   settings.default_layout === l ? "bg-lime-400 text-black" : "text-zinc-400"
                 }`}
               >
@@ -237,7 +243,7 @@ export default function SettingsSheet({
         <Section title="Vistas">
           {views.map((v) => (
             <div key={v.id} className="mb-3">
-            <div className="flex items-center gap-2">
+            <div>
               <button
                 role="checkbox"
                 aria-checked={settings.active_view_ids.includes(v.id)}
@@ -248,25 +254,29 @@ export default function SettingsSheet({
                       : [...settings.active_view_ids, v.id],
                   })
                 }
-                className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md ring-1 transition ${
-                  settings.active_view_ids.includes(v.id)
-                    ? "border-transparent bg-lime-400 text-black"
-                    : "border-transparent bg-zinc-800 ring-white/15"
-                }`}
+                className="flex min-h-11 w-full items-center gap-2 text-left"
               >
+                <span
+                  className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md ring-1 transition ${
+                    settings.active_view_ids.includes(v.id)
+                      ? "border-transparent bg-lime-400 text-black"
+                      : "border-transparent bg-zinc-800 ring-white/15"
+                  }`}
+                >
                 {settings.active_view_ids.includes(v.id) && <IconX className="hidden" />}
                 {settings.active_view_ids.includes(v.id) && (
                   <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={3}>
                     <path d="M20 6 9 17l-5-5" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                 )}
+                </span>
+                <span className="min-w-0 flex-1 truncate text-sm">{v.name}</span>
               </button>
-              <span className="min-w-0 flex-1 truncate text-sm">{v.name}</span>
             </div>
-            <div className="mt-2 flex flex-wrap gap-2 pl-7">
+            <div className="flex flex-wrap gap-2 pl-7">
               <button
                 onClick={() => onEditGuides(v.id)}
-                className="flex items-center gap-1 rounded-full bg-zinc-800 px-3 py-1.5 text-xs text-zinc-300 ring-1 ring-white/10 transition active:scale-95"
+                className="flex items-center gap-1 rounded-full bg-zinc-800 min-h-11 px-3 py-1.5 text-xs text-zinc-300 ring-1 ring-white/10 transition active:scale-95"
               >
                 <IconGuides className="h-3 w-3" />
                 Guías
@@ -276,7 +286,7 @@ export default function SettingsSheet({
                   const name = window.prompt("Nombre de la vista", v.name);
                   if (name?.trim()) onRenameView(v.id, name.trim());
                 }}
-                className="flex items-center gap-1 rounded-full bg-zinc-800 px-3 py-1.5 text-xs text-zinc-300 ring-1 ring-white/10 transition active:scale-95"
+                className="flex items-center gap-1 rounded-full bg-zinc-800 min-h-11 px-3 py-1.5 text-xs text-zinc-300 ring-1 ring-white/10 transition active:scale-95"
               >
                 <IconPencil className="h-3 w-3" />
                 Renombrar
@@ -286,7 +296,7 @@ export default function SettingsSheet({
                   if (window.confirm(`¿Borrar la vista "${v.name}"? Las fotos ya subidas no se borran.`))
                     onDeleteView(v.id);
                 }}
-                className="flex items-center gap-1 rounded-full bg-zinc-800 px-3 py-1.5 text-xs text-red-300 ring-1 ring-white/10 transition active:scale-95"
+                className="flex items-center gap-1 rounded-full bg-zinc-800 min-h-11 px-3 py-1.5 text-xs text-red-300 ring-1 ring-white/10 transition active:scale-95"
               >
                 <IconTrash className="h-3 w-3" />
                 Borrar
@@ -299,7 +309,7 @@ export default function SettingsSheet({
               value={newView}
               onChange={(e) => setNewView(e.target.value)}
               placeholder="Nueva vista (p. ej. Lateral)"
-              className="flex-1 rounded-xl bg-zinc-800/70 px-4 py-2.5 text-sm ring-1 ring-white/10 outline-none focus:ring-lime-400"
+              className="flex-1 rounded-xl bg-zinc-800/70 px-4 min-h-11 py-2.5 text-sm ring-1 ring-white/10 outline-none focus:ring-lime-400"
             />
             <button
               onClick={() => {
@@ -308,7 +318,7 @@ export default function SettingsSheet({
                   setNewView("");
                 }
               }}
-              className="rounded-full bg-lime-400 px-5 py-2.5 text-sm font-bold text-black transition active:scale-95"
+              className="rounded-full bg-lime-400 px-5 min-h-11 py-2.5 text-sm font-bold text-black transition active:scale-95"
             >
               Añadir
             </button>
@@ -320,7 +330,7 @@ export default function SettingsSheet({
         <Section title="Papelera">
           <button
             onClick={onOpenTrash}
-            className="flex w-full items-center justify-between py-2.5 text-left"
+            className="flex w-full items-center justify-between min-h-11 py-2.5 text-left"
           >
             <span className="text-sm text-zinc-200">
               Registros en papelera
@@ -349,7 +359,7 @@ export default function SettingsSheet({
             <button
               onClick={doExport}
               disabled={busy}
-              className="flex flex-1 items-center justify-center gap-1.5 rounded-full bg-lime-400 py-2.5 text-sm font-bold text-black transition active:scale-95 disabled:opacity-50"
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-full bg-lime-400 min-h-11 py-2.5 text-sm font-bold text-black transition active:scale-95 disabled:opacity-50"
             >
               <IconDownload className="h-4 w-4" />
               Exportar ZIP
@@ -357,7 +367,7 @@ export default function SettingsSheet({
             <button
               onClick={() => importRef.current?.click()}
               disabled={busy}
-              className="flex flex-1 items-center justify-center gap-1.5 rounded-full bg-zinc-800 py-2.5 text-sm font-medium ring-1 ring-white/10 transition active:scale-95 disabled:opacity-50"
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-full bg-zinc-800 min-h-11 py-2.5 text-sm font-medium ring-1 ring-white/10 transition active:scale-95 disabled:opacity-50"
             >
               <IconUpload className="h-4 w-4" />
               Importar ZIP
@@ -379,7 +389,7 @@ export default function SettingsSheet({
 
         <section className="px-1 text-xs text-zinc-500">
           <p>
-            Almacenamiento: {storageOk ? "OPFS (privado del navegador)" : "sin OPFS"}
+            Almacenamiento: {storageOk ? "OPFS (privado del navegador)" : `sin OPFS (${opfsReason() || "?"})`}
             {uso !== null && limite !== null ? ` · usado ${uso} de ~${limite}` : ""}
           </p>
           <p className="mt-1">Todo se guarda solo en este dispositivo.</p>

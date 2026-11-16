@@ -30,7 +30,7 @@ export default function SecuritySection({
   const [err, setErr] = useState<string | null>(null);
 
   const inputCls =
-    "w-full rounded-xl bg-zinc-800/70 px-4 py-2.5 text-sm ring-1 ring-white/10 outline-none focus:ring-lime-400";
+    "w-full rounded-xl bg-zinc-800/70 px-4 min-h-11 py-2.5 text-sm ring-1 ring-white/10 outline-none focus:ring-lime-400";
 
   async function run(fn: () => Promise<void>, okMsg: string) {
     setBusy(true);
@@ -111,7 +111,7 @@ export default function SecuritySection({
             <button
               disabled={busy || pw1.length < 6 || pw1 !== pw2 || !understood}
               onClick={() => void run(() => enableProtection(pw1), "Protección activada. Tus fotos y notas ya están cifradas.")}
-              className="w-full rounded-full bg-lime-400 py-2.5 text-sm font-bold text-black transition active:scale-95 disabled:opacity-50"
+              className="w-full rounded-full bg-lime-400 min-h-11 py-2.5 text-sm font-bold text-black transition active:scale-95 disabled:opacity-50"
             >
               {busy ? "Cifrando tus datos…" : "Activar protección"}
             </button>
@@ -131,7 +131,7 @@ export default function SecuritySection({
               lock();
               onLocked();
             }}
-            className="mb-3 w-full rounded-full bg-zinc-800 py-2.5 text-sm font-medium ring-1 ring-white/10 transition active:scale-95"
+            className="mb-3 w-full rounded-full bg-zinc-800 min-h-11 py-2.5 text-sm font-medium ring-1 ring-white/10 transition active:scale-95"
           >
             Bloquear ahora
           </button>
@@ -164,7 +164,7 @@ export default function SecuritySection({
             <button
               disabled={busy || !pwOld || pw1.length < 6 || pw1 !== pw2}
               onClick={() => void run(() => changePassword(pwOld, pw1), "Contraseña cambiada y datos recifrados.")}
-              className="w-full rounded-full bg-zinc-800 py-2.5 text-sm font-medium ring-1 ring-white/10 transition active:scale-95 disabled:opacity-50"
+              className="w-full rounded-full bg-zinc-800 min-h-11 py-2.5 text-sm font-medium ring-1 ring-white/10 transition active:scale-95 disabled:opacity-50"
             >
               {busy ? "Recifrando…" : "Cambiar contraseña"}
             </button>
@@ -180,7 +180,7 @@ export default function SecuritySection({
                 if (window.confirm("¿Descifrar todos los datos y desactivar la protección?"))
                   void run(() => disableProtection(pwOld), "Protección desactivada. Datos descifrados.");
               }}
-              className="w-full rounded-full bg-red-500/10 py-2.5 text-sm font-medium text-red-300 ring-1 ring-red-500/30 transition active:scale-95 disabled:opacity-50"
+              className="w-full rounded-full bg-red-500/10 min-h-11 py-2.5 text-sm font-medium text-red-300 ring-1 ring-red-500/30 transition active:scale-95 disabled:opacity-50"
             >
               Desactivar y descifrar
             </button>

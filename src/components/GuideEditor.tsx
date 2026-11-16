@@ -6,6 +6,16 @@ import { useFrame34 } from "@/lib/useFrame34";
 import type { Stroke } from "@/lib/db";
 import { IconBrush, IconCheck, IconLine, IconPhoto, IconTrash, IconUndo, IconX } from "./icons";
 
+const MIN_STROKE = 0.01;
+
+function strokeLength(s: Stroke): number {
+  let total = 0;
+  for (let i = 1; i < s.points.length; i++) {
+    total += Math.hypot(s.points[i][0] - s.points[i - 1][0], s.points[i][1] - s.points[i - 1][1]);
+  }
+  return total;
+}
+
 // Editor de guias: lineas rectas y pincel libre sobre el marco 3:4, con
 // coordenadas normalizadas 0.0-1.0 (setup.md, fase 2). Se pueden dibujar
 // sobre una foto base (la ultima de esa vista) o sobre el marco vacio.
@@ -64,7 +74,9 @@ export default function GuideEditor({
     if (!drawing.current) return;
     drawing.current = false;
     setDraft((d) => {
-      if (d && d.points.length >= 2) setStrokes((s) => [...s, d]);
+      // Un toque sin arrastrar dejaba una linea de longitud 0 (invisible):
+      // se descarta si mide menos del 1% del marco.
+      if (d && d.points.length >= 2 && strokeLength(d) >= MIN_STROKE) setStrokes((s) => [...s, d]);
       return null;
     });
   }
@@ -77,7 +89,7 @@ export default function GuideEditor({
         <button
           onClick={onCancel}
           aria-label="Cancelar"
-          className="flex h-10 w-10 items-center justify-center rounded-full bg-zinc-900 text-zinc-300 ring-1 ring-white/10 transition active:scale-95"
+          className="flex h-11 w-11 items-center justify-center rounded-full bg-zinc-900 text-zinc-300 ring-1 ring-white/10 transition active:scale-95"
         >
           <IconX className="h-4.5 w-4.5" />
         </button>
@@ -87,7 +99,7 @@ export default function GuideEditor({
         </div>
         <button
           onClick={() => onSave(strokes)}
-          className="flex h-10 items-center gap-1.5 rounded-full bg-lime-400 px-4 text-sm font-bold text-black shadow-lg shadow-lime-400/25 transition active:scale-95"
+          className="flex h-11 items-center gap-1.5 rounded-full bg-lime-400 px-4 text-sm font-bold text-black shadow-lg shadow-lime-400/25 transition active:scale-95"
         >
           <IconCheck className="h-4 w-4" />
           Guardar
@@ -97,7 +109,7 @@ export default function GuideEditor({
       <div ref={boxRef} className="flex min-h-0 flex-1 items-center justify-center overflow-hidden p-4">
         <div
           ref={frameRef}
-          className="relative touch-none"
+          className="relative touch-none select-none [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none]"
           style={{ width: size.w, height: size.h }}
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
