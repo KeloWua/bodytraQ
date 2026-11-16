@@ -386,12 +386,13 @@ export default function Page() {
 
       {modal.kind === "checkin" && (
         <CheckInForm
+          occupiedDates={checkIns.map((c) => c.date)}
           initialDate={modal.editing?.date}
           initialWeightKg={modal.editing?.weight_kg}
           initialNotes={modal.editing?.notes}
           unit={settings.weight_unit}
           onSave={async (date, weightKg, notes) => {
-            const row = await upsertCheckIn(date, weightKg, notes);
+            const row = await upsertCheckIn(date, weightKg, notes, modal.editing?.id);
             setModal({ kind: "none" });
             await reload();
             const list = await listCheckIns();
@@ -483,7 +484,7 @@ export default function Page() {
             </span>
             <button
               onClick={() => handleUndoTrash(undoToast.checkInId)}
-              className="rounded-full bg-lime-400 px-4 py-1.5 text-sm font-bold text-black transition active:scale-95"
+              className="min-h-11 rounded-full bg-lime-400 px-4 py-1.5 text-sm font-bold text-black transition active:scale-95"
             >
               Deshacer
             </button>
@@ -540,6 +541,7 @@ export default function Page() {
 
       {modal.kind === "camera" && (
         <CameraCapture
+          viewId={modal.viewId}
           guides={parseGuidesSafe(views.find((v) => v.id === modal.viewId)?.guides)}
           onCapture={(file) =>
             setModal({ kind: "align", checkInId: modal.checkInId, viewId: modal.viewId, file })

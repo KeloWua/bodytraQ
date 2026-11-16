@@ -19,7 +19,7 @@ export interface PhotoTransform {
 // - La transformacion se aplica a una capa que mide exactamente el 100% del
 //   marco, asi offset_x = 0.1 es siempre el 10% del ancho del marco en
 //   cualquier pantalla.
-function baseCoverStyle(width: number, height: number): React.CSSProperties {
+export function baseCoverStyle(width: number, height: number): React.CSSProperties {
   const ratio = width / height;
   if (ratio > 0.75) {
     // Mas ancha que 3:4: altura completa, el ancho sobresale centrado.
@@ -89,7 +89,13 @@ export default function AlignedPhoto({
   const editable = Boolean(onClick && srcUrl && transform);
   return (
     <div
-      className={`relative aspect-[3/4] w-full touch-none overflow-hidden rounded-2xl bg-zinc-900 ring-1 ring-white/10 shadow-xl shadow-black/40 select-none ${
+      // pan-y (no touch-none): en el timeline el bloque de foto ocupa casi toda
+      // la pantalla; con touch-none el navegador no podia hacer scroll vertical
+      // empezando sobre la foto. pan-y permite el scroll vertical y sigue
+      // entregando los gestos horizontales al swipe de fechas del timeline.
+      // Los editores (PhotoAligner/GuideEditor) envuelven este componente con
+      // su propio touch-none, asi que sus gestos no cambian.
+      className={`relative aspect-[3/4] w-full touch-pan-y overflow-hidden rounded-2xl bg-zinc-900 ring-1 ring-white/10 shadow-xl shadow-black/40 select-none ${
         editable ? "cursor-pointer" : ""
       }`}
       onClick={editable ? onClick : undefined}
@@ -123,6 +129,39 @@ export default function AlignedPhoto({
           <IconPencil className="h-4 w-4" />
         </span>
       )}
+    </div>
+  );
+}
+
+// Silueta: la foto con su misma alineacion, sin fondo ni marco y con opacidad
+// ajustable. Se usa como guia sobre la camara. No recibe toques.
+export function GhostPhoto({
+  srcUrl,
+  transform,
+  opacity,
+}: {
+  srcUrl: string;
+  transform: PhotoTransform;
+  opacity: number;
+}) {
+  return (
+    <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl" style={{ opacity }}>
+      <div
+        className="absolute inset-0"
+        style={{
+          transform: `translate(${transform.offset_x * 100}%, ${transform.offset_y * 100}%) rotate(${transform.rotation}deg) scale(${transform.scale})`,
+          transformOrigin: "center center",
+        }}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={srcUrl}
+          alt=""
+          draggable={false}
+          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"
+          style={baseCoverStyle(transform.width, transform.height)}
+        />
+      </div>
     </div>
   );
 }

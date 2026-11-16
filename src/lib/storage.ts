@@ -6,20 +6,39 @@
 // dice claramente en lugar de aparentar persistencia.
 
 let cachedSupport: boolean | null = null;
+let cachedReason = "";
 
+// Motivo del ultimo chequeo (vacio si OPFS funciona). Solo informativo.
+export function opfsReason(): string {
+  return cachedReason;
+}
+
+// Chequeo NO mutante: no crea ni escribe ni borra archivos. Comprueba que
+// existe la API, que el directorio raiz se abre y que el navegador sabe
+// escribir (createWritable). Guarda el motivo para mostrarlo al usuario.
 export async function opfsSupported(): Promise<boolean> {
   if (cachedSupport !== null) return cachedSupport;
-  try {
-    if (typeof navigator === "undefined" || !navigator.storage?.getDirectory) {
-      cachedSupport = false;
-      return false;
-    }
-    await navigator.storage.getDirectory();
-    cachedSupport = true;
-  } catch {
-    cachedSupport = false;
+  cachedSupport = false;
+  if (typeof navigator === "undefined" || !navigator.storage?.getDirectory) {
+    cachedReason = "sin-api";
+    return false;
   }
-  return cachedSupport;
+  try {
+    await navigator.storage.getDirectory();
+  } catch (e) {
+    cachedReason = "error-directorio:" + ((e as Error)?.name ?? "desconocido");
+    return false;
+  }
+  if (
+    typeof FileSystemFileHandle === "undefined" ||
+    typeof FileSystemFileHandle.prototype.createWritable !== "function"
+  ) {
+    cachedReason = "sin-escritura";
+    return false;
+  }
+  cachedReason = "";
+  cachedSupport = true;
+  return true;
 }
 
 async function rootDir(): Promise<FileSystemDirectoryHandle> {

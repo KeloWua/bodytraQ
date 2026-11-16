@@ -108,7 +108,7 @@ export default function PhotoAligner({
         <button
           onClick={onCancel}
           aria-label="Cancelar"
-          className="flex h-10 w-10 items-center justify-center rounded-full bg-zinc-900 text-zinc-300 ring-1 ring-white/10 transition active:scale-95"
+          className="flex h-11 w-11 items-center justify-center rounded-full bg-zinc-900 text-zinc-300 ring-1 ring-white/10 transition active:scale-95"
         >
           <IconX className="h-4.5 w-4.5" />
         </button>
@@ -125,7 +125,7 @@ export default function PhotoAligner({
               offset_y: state.current.offsetY,
             })
           }
-          className="flex h-10 items-center gap-1.5 rounded-full bg-lime-400 px-4 text-sm font-bold text-black shadow-lg shadow-lime-400/25 transition active:scale-95"
+          className="flex h-11 items-center gap-1.5 rounded-full bg-lime-400 px-4 text-sm font-bold text-black shadow-lg shadow-lime-400/25 transition active:scale-95"
         >
           <IconCheck className="h-4 w-4" />
           Guardar
@@ -177,14 +177,14 @@ export default function PhotoAligner({
         <div className="flex items-center gap-2">
           <button
             onClick={() => setRotation((r) => clamp(r - 1, -180, 180))}
-            className="flex flex-1 items-center justify-center gap-1 rounded-full bg-zinc-800 py-2.5 text-xs font-medium ring-1 ring-white/10 transition active:scale-95"
+            className="flex flex-1 items-center justify-center gap-1 rounded-full bg-zinc-800 min-h-11 py-2.5 text-xs font-medium ring-1 ring-white/10 transition active:scale-95"
           >
             <IconRotate className="h-3.5 w-3.5 -scale-x-100" />
             -1°
           </button>
           <button
             onClick={() => setRotation((r) => clamp(r + 1, -180, 180))}
-            className="flex flex-1 items-center justify-center gap-1 rounded-full bg-zinc-800 py-2.5 text-xs font-medium ring-1 ring-white/10 transition active:scale-95"
+            className="flex flex-1 items-center justify-center gap-1 rounded-full bg-zinc-800 min-h-11 py-2.5 text-xs font-medium ring-1 ring-white/10 transition active:scale-95"
           >
             <IconRotate className="h-3.5 w-3.5" />
             +1°
@@ -196,7 +196,7 @@ export default function PhotoAligner({
               setOffsetX(0);
               setOffsetY(0);
             }}
-            className="flex flex-1 items-center justify-center gap-1 rounded-full bg-zinc-800 py-2.5 text-xs font-medium ring-1 ring-white/10 transition active:scale-95"
+            className="flex flex-1 items-center justify-center gap-1 rounded-full bg-zinc-800 min-h-11 py-2.5 text-xs font-medium ring-1 ring-white/10 transition active:scale-95"
           >
             <IconUndo className="h-3.5 w-3.5" />
             Reiniciar
@@ -204,7 +204,7 @@ export default function PhotoAligner({
           <button
             onClick={() => setShowGuides((v) => !v)}
             aria-label="Guías"
-            className={`flex flex-1 items-center justify-center gap-1 rounded-full py-2.5 text-xs font-medium ring-1 ring-white/10 transition active:scale-95 ${
+            className={`flex flex-1 items-center justify-center gap-1 rounded-full min-h-11 py-2.5 text-xs font-medium ring-1 ring-white/10 transition active:scale-95 ${
               showGuides ? "bg-zinc-700 text-lime-300" : "bg-zinc-800 text-zinc-500"
             }`}
           >
