@@ -89,7 +89,13 @@ export default function AlignedPhoto({
   const editable = Boolean(onClick && srcUrl && transform);
   return (
     <div
-      className={`relative aspect-[3/4] w-full touch-none overflow-hidden rounded-2xl bg-zinc-900 ring-1 ring-white/10 shadow-xl shadow-black/40 select-none ${
+      // pan-y (no touch-none): en el timeline el bloque de foto ocupa casi toda
+      // la pantalla; con touch-none el navegador no podia hacer scroll vertical
+      // empezando sobre la foto. pan-y permite el scroll vertical y sigue
+      // entregando los gestos horizontales al swipe de fechas del timeline.
+      // Los editores (PhotoAligner/GuideEditor) envuelven este componente con
+      // su propio touch-none, asi que sus gestos no cambian.
+      className={`relative aspect-[3/4] w-full touch-pan-y overflow-hidden rounded-2xl bg-zinc-900 ring-1 ring-white/10 shadow-xl shadow-black/40 select-none ${
         editable ? "cursor-pointer" : ""
       }`}
       onClick={editable ? onClick : undefined}
