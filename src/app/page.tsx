@@ -682,12 +682,12 @@ function TutorialVideo({ onClose }: { onClose: () => void }) {
   }, [onClose]);
   return <div ref={dialogRef} onKeyDown={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="tutorial-title" className="fixed inset-0 z-[100] flex flex-col bg-zinc-950">
     <header className="flex shrink-0 items-center justify-between gap-3 px-4 py-2 pt-[max(.5rem,env(safe-area-inset-top))]">
-      <div><h2 id="tutorial-title" className="text-sm font-bold">Cómo empezar</h2><p className="text-xs text-zinc-400">55 s · Sin voz · Fotos ficticias</p></div>
+      <div><h2 id="tutorial-title" className="text-sm font-bold">Cómo empezar</h2><p className="text-xs text-zinc-400">79 s · Sin voz · Fotos ficticias</p></div>
       <button ref={closeRef} onClick={onClose} className="min-h-11 rounded-full bg-zinc-800 px-5 text-sm font-medium">Saltar</button>
     </header>
     <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden">
       {failed ? <p role="alert" className="max-w-sm p-6 text-sm text-zinc-300">No se ha podido cargar el vídeo. Puedes continuar y volver a intentarlo desde Ajustes.</p> :
-        <video aria-label="Tutorial para crear guías y tu primer registro" src="/2-bodytraq-tutorial-safe.mp4" controls autoPlay muted playsInline preload="metadata" onError={() => setFailed(true)} className="h-full min-h-0 max-w-full object-contain" />}
+        <video aria-label="Tutorial para crear guías y tu primer registro" src="/1-3-bodytraq-tutorial-taps.mp4" controls autoPlay muted playsInline preload="metadata" onError={() => setFailed(true)} className="h-full min-h-0 max-w-full object-contain" />}
     </div>
     <footer className="flex shrink-0 items-center justify-center gap-3 px-4 py-2 pb-[max(.5rem,env(safe-area-inset-bottom))]">
       <p className="max-w-48 text-xs text-zinc-400">Puedes volver a verlo en Ajustes.</p>
