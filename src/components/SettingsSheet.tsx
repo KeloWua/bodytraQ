@@ -68,6 +68,7 @@ export default function SettingsSheet({
   onImported,
   onClose,
   onOpenTrash,
+  onOpenTutorial,
 }: {
   settings: Settings;
   views: ViewProfile[];
@@ -85,6 +86,7 @@ export default function SettingsSheet({
   onImported: () => void;
   onClose: () => void;
   onOpenTrash: () => void;
+  onOpenTutorial: () => void;
 }) {
   const [newView, setNewView] = useState("");
   const [busy, setBusy] = useState(false);
@@ -178,7 +180,10 @@ export default function SettingsSheet({
           </div>
         )}
 
-        <Section title="Cuerpo">
+        <Section title="Primeros pasos">
+        <button onClick={onOpenTutorial} className="min-h-11 w-full rounded-xl bg-zinc-800 px-4 py-3 text-left text-sm font-semibold text-lime-300 ring-1 ring-white/10">Ver tutorial · 55 s sin voz</button>
+      </Section>
+      <Section title="Cuerpo">
           <label className="mb-1.5 block text-xs text-zinc-400">Altura (cm, para el IMC)</label>
           <input
             type="number"

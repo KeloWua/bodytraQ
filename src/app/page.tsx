@@ -54,6 +54,16 @@ interface UndoToast {
 }
 
 export default function Page() {
+  // Experimento aislado en feat/tutorial-inicial-test. No cambia registros.
+  const [showTutorial, setShowTutorial] = useState(false);
+  useEffect(() => {
+    try { setShowTutorial(localStorage.getItem("bodytraq:tutorial-test:v1:seen") !== "1"); }
+    catch { setShowTutorial(true); }
+  }, []);
+  function closeTutorial() {
+    try { localStorage.setItem("bodytraq:tutorial-test:v1:seen", "1"); } catch { /* sin persistencia, se puede saltar igualmente */ }
+    setShowTutorial(false);
+  }
   const [ready, setReady] = useState(false);
   const [locked, setLocked] = useState(false);
   const [protection, setProtection] = useState(false);
@@ -351,6 +361,7 @@ export default function Page() {
 
   return (
     <>
+      {showTutorial && <TutorialVideo onClose={closeTutorial} />}
       <Timeline
         settings={settings}
         views={views}
@@ -405,6 +416,7 @@ export default function Page() {
 
       {modal.kind === "settings" && (
         <SettingsSheet
+          onOpenTutorial={() => { setModal({ kind: "none" }); setShowTutorial(true); }}
           settings={settings}
           views={views}
           storageOk={storageOk}
@@ -644,4 +656,42 @@ function parseGuidesSafe(json: string | undefined): Stroke[] {
   } catch {
     return [];
   }
+}
+
+// Video autocontenido, sin red de terceros ni datos personales.
+function TutorialVideo({ onClose }: { onClose: () => void }) {
+  const [failed, setFailed] = useState(false);
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const previous = document.activeElement as HTMLElement | null;
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    closeRef.current?.focus();
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") { e.preventDefault(); onClose(); }
+      if (e.key === "Tab") {
+        const controls = dialogRef.current?.querySelectorAll<HTMLElement>("button, video[controls]");
+        const first = controls?.[0], last = controls?.[controls.length - 1];
+        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last?.focus(); }
+        else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first?.focus(); }
+      }
+    }
+    document.addEventListener("keydown", onKey, true);
+    return () => { document.body.style.overflow = overflow; document.removeEventListener("keydown", onKey, true); previous?.focus(); };
+  }, [onClose]);
+  return <div ref={dialogRef} onKeyDown={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="tutorial-title" className="fixed inset-0 z-[100] flex flex-col bg-zinc-950">
+    <header className="flex shrink-0 items-center justify-between gap-3 px-4 py-2 pt-[max(.5rem,env(safe-area-inset-top))]">
+      <div><h2 id="tutorial-title" className="text-sm font-bold">Cómo empezar</h2><p className="text-xs text-zinc-400">79 s · Sin voz · Fotos ficticias</p></div>
+      <button ref={closeRef} onClick={onClose} className="min-h-11 rounded-full bg-zinc-800 px-5 text-sm font-medium">Saltar</button>
+    </header>
+    <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden">
+      {failed ? <p role="alert" className="max-w-sm p-6 text-sm text-zinc-300">No se ha podido cargar el vídeo. Puedes continuar y volver a intentarlo desde Ajustes.</p> :
+        <video aria-label="Tutorial para crear guías y tu primer registro" src="/1-3-bodytraq-tutorial-taps.mp4" controls autoPlay muted playsInline preload="metadata" onError={() => setFailed(true)} className="h-full min-h-0 max-w-full object-contain" />}
+    </div>
+    <footer className="flex shrink-0 items-center justify-center gap-3 px-4 py-2 pb-[max(.5rem,env(safe-area-inset-bottom))]">
+      <p className="max-w-48 text-xs text-zinc-400">Puedes volver a verlo en Ajustes.</p>
+      <button onClick={onClose} className="min-h-11 rounded-full bg-lime-400 px-6 text-sm font-bold text-black">Empezar</button>
+    </footer>
+  </div>;
 }
