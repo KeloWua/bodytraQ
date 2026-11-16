@@ -386,12 +386,13 @@ export default function Page() {
 
       {modal.kind === "checkin" && (
         <CheckInForm
+          occupiedDates={checkIns.map((c) => c.date)}
           initialDate={modal.editing?.date}
           initialWeightKg={modal.editing?.weight_kg}
           initialNotes={modal.editing?.notes}
           unit={settings.weight_unit}
           onSave={async (date, weightKg, notes) => {
-            const row = await upsertCheckIn(date, weightKg, notes);
+            const row = await upsertCheckIn(date, weightKg, notes, modal.editing?.id);
             setModal({ kind: "none" });
             await reload();
             const list = await listCheckIns();
