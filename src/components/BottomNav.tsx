@@ -7,7 +7,7 @@ type TabId = "fotos" | "comparar" | "evolucion" | "ajustes";
 const TABS: { id: TabId; label: string; icon: typeof IconPhoto }[] = [
   { id: "fotos", label: "Fotos", icon: IconPhoto },
   { id: "comparar", label: "Comparar", icon: IconCompare },
-  { id: "evolucion", label: "Evolucion", icon: IconChart },
+  { id: "evolucion", label: "Evolución", icon: IconChart },
   { id: "ajustes", label: "Ajustes", icon: IconGear },
 ];
 
