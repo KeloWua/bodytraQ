@@ -36,6 +36,7 @@ import GuideEditor from "@/components/GuideEditor";
 import CameraCapture from "@/components/CameraCapture";
 import CompareSheet from "@/components/CompareSheet";
 import BottomNav from "@/components/BottomNav";
+import DateSlider from "@/components/DateSlider";
 import EvolutionView from "@/components/EvolutionView";
 import { IconCamera, IconPhoto, IconPlus } from "@/components/icons";
 
@@ -422,34 +423,55 @@ export default function Page() {
       >
         {/* Fila contextual: solo en Fotos y con registros */}
         {tab === "fotos" && checkIns.length > 0 && (
-          <div className="flex items-center justify-between border-t border-white/5 bg-zinc-950/80 backdrop-blur-md px-4 py-2">
-            <button
-              onClick={() => go(-1)}
-              disabled={index <= 0}
-              aria-label="Fecha anterior"
-              className="flex h-12 w-12 items-center justify-center rounded-full bg-zinc-900 ring-1 ring-white/10 transition active:scale-95 disabled:opacity-30"
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
-                <path d="m15 18-6-6 6-6" />
-              </svg>
-            </button>
-            <button
-              onClick={() => setModal({ kind: "checkin" })}
-              className="flex items-center gap-2 rounded-full bg-lime-400 px-6 py-3.5 text-sm font-bold text-black shadow-lg shadow-lime-400/25 transition active:scale-95"
-            >
-              <IconPlus className="h-4 w-4" />
-              Nuevo registro
-            </button>
-            <button
-              onClick={() => go(1)}
-              disabled={index >= checkIns.length - 1}
-              aria-label="Fecha siguiente"
-              className="flex h-12 w-12 items-center justify-center rounded-full bg-zinc-900 ring-1 ring-white/10 transition active:scale-95 disabled:opacity-30"
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
-                <path d="m9 18 6-6-6-6" />
-              </svg>
-            </button>
+          <div className="flex items-center border-t border-white/5 bg-zinc-950/80 backdrop-blur-md px-4 py-2">
+            {settings.date_nav === "slider" ? (
+              <>
+                <DateSlider
+                  checkIns={checkIns}
+                  index={index}
+                  onSelect={setIndex}
+                />
+                <button
+                  onClick={() => setModal({ kind: "checkin" })}
+                  aria-label="Nuevo registro"
+                  className="ml-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-lime-400 text-black transition active:scale-95"
+                >
+                  <IconPlus className="h-5 w-5" />
+                </button>
+              </>
+            ) : (
+              <>
+                <div className="flex flex-1 items-center justify-between">
+                  <button
+                    onClick={() => go(-1)}
+                    disabled={index <= 0}
+                    aria-label="Fecha anterior"
+                    className="flex h-12 w-12 items-center justify-center rounded-full bg-zinc-900 ring-1 ring-white/10 transition active:scale-95 disabled:opacity-30"
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
+                      <path d="m15 18-6-6 6-6" />
+                    </svg>
+                  </button>
+                  <button
+                    onClick={() => setModal({ kind: "checkin" })}
+                    className="flex items-center gap-2 rounded-full bg-lime-400 px-6 py-3.5 text-sm font-bold text-black shadow-lg shadow-lime-400/25 transition active:scale-95"
+                  >
+                    <IconPlus className="h-4 w-4" />
+                    Nuevo registro
+                  </button>
+                  <button
+                    onClick={() => go(1)}
+                    disabled={index >= checkIns.length - 1}
+                    aria-label="Fecha siguiente"
+                    className="flex h-12 w-12 items-center justify-center rounded-full bg-zinc-900 ring-1 ring-white/10 transition active:scale-95 disabled:opacity-30"
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
+                      <path d="m9 18 6-6-6-6" />
+                    </svg>
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         )}
         {/* Fila de pestañas */}
