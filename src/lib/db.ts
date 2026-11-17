@@ -15,6 +15,7 @@ export interface Settings {
   keep_original: boolean;
   schema_version: number;
   theme: "dark" | "light";
+  date_nav?: "arrows" | "slider";
 }
 
 export interface ViewProfile {
@@ -138,6 +139,7 @@ export function defaultSettings(): Settings {
     keep_original: false,
     schema_version: SCHEMA_VERSION,
     theme: "dark",
+    date_nav: "arrows",
   };
 }
 
@@ -193,7 +195,10 @@ export async function getSettings(): Promise<Settings> {
   ppv = Math.min(4, Math.max(1, Math.round(ppv)));
   // Migracion perezosa de theme: si no existe o no es valido, usar "dark".
   const theme = (s.theme === "light" ? "light" : "dark") as "dark" | "light";
-  return { ...s, photos_per_view: ppv, theme };
+  // Migracion perezosa de date_nav: si falta o no es valido, usar "arrows".
+  const rawDateNav = s.date_nav;
+  const dateNav = (rawDateNav === "slider" ? "slider" : "arrows") as "arrows" | "slider";
+  return { ...s, photos_per_view: ppv, theme, date_nav: dateNav };
 }
 
 export async function activeViews(): Promise<ViewProfile[]> {

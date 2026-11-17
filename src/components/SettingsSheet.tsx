@@ -262,6 +262,29 @@ export default function SettingsSheet({
             onChange={(v) => onChangeSettings({ keep_original: v })}
             label="Guardar también la foto original intacta"
           />
+          <div className="mt-3">
+            <label className="mb-1.5 block text-xs text-zinc-400">
+              Selector de fechas
+            </label>
+            <div className="mb-1 flex rounded-full bg-zinc-800 p-1 ring-1 ring-white/10">
+              {(["arrows", "slider"] as const).map((v) => (
+                <button
+                  key={v}
+                  onClick={() => onChangeSettings({ date_nav: v })}
+                  className={`min-h-11 flex-1 rounded-full py-2 text-sm font-semibold transition ${
+                    (settings.date_nav ?? "arrows") === v
+                      ? "bg-lime-400 text-black"
+                      : "text-zinc-400"
+                  }`}
+                >
+                  {v === "arrows" ? "Flechas" : "Slider"}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-zinc-500">
+              Slider: prueba experimental para ir a una fecha deslizando.
+            </p>
+          </div>
         </Section>
 
         <Section title="Vistas">
