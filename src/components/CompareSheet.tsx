@@ -378,7 +378,7 @@ export default function CompareSheet({
           {/* Capa B: wrapper sin transform con clip-path, dentro tiene el mismo transform */}
           <div
             className="absolute inset-0"
-            style={{ clipPath: `inset(0 ${100 - dividerX * 100}% 0 0)` }}
+            style={{ clipPath: `inset(0 0 0 ${dividerX * 100}%)` }}
           >
             <div
               className="absolute inset-0"
@@ -407,6 +407,7 @@ export default function CompareSheet({
             </div>
           </div>
           </>
+        )}
 
         {/* Etiquetas de fecha en las esquinas */}
         {photoA && photoB && (
