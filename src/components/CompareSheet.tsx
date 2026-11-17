@@ -390,15 +390,18 @@ export default function CompareSheet({
                 </div>
               </div>
 
-              {/* Divisor arrastrable — fuera del transform, fijo dentro de la caja de la foto */}
+              {/* Divisor arrastrable — zona táctil amplia, línea fina, handle transparente */}
               <div
                 ref={dividerRef}
-                className="absolute top-0 bottom-0 w-1 bg-lime-400 cursor-col-resize"
-                style={{ left: `${dividerX * 100}%`, transform: "translateX(-50%)" }}
+                className="absolute top-0 bottom-0 w-10 bg-transparent cursor-col-resize -translate-x-1/2"
+                style={{ left: `${dividerX * 100}%` }}
                 onPointerDown={handleDividerPointerDown}
               >
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-10 w-8 rounded-full bg-lime-400 ring-2 ring-white shadow-lg flex items-center justify-center">
-                  <div className="w-0.5 h-4 bg-black rounded-full" />
+                {/* Línea visual fina centrada */}
+                <div className="mx-auto h-full w-px bg-lime-400/50" />
+                {/* Botón central (handle) transparente */}
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-10 w-8 rounded-full bg-lime-400/10 ring-1 ring-white/20 shadow-lg flex items-center justify-center">
+                  <div className="w-0.5 h-4 bg-white/40 rounded-full" />
                 </div>
               </div>
             </div>
