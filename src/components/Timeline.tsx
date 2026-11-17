@@ -26,12 +26,13 @@ function parseGuides(json: string) {
   }
 }
 
-// Timeline: navega por fechas con flechas, teclado y swipe; muestra 1 o 2
-// vistas con la misma matematica 3:4 del editor; precarga fechas adyacentes
-// para que el timelapse no parpadee. El modo (1 o 2) solo fija cuantas
-// vistas se ven a la vez: en modo 1 la lista de vistas se desplaza en
-// horizontal y en modo 2 las flechas recorren todas las vistas por parejas,
-// asi ninguna vista queda fuera de alcance.
+// Timeline: navega por fechas con flechas, teclado y swipe; muestra de 1 a 4
+// vistas a la vez (se elige aqui o en Ajustes > "¿Como quieres ver tus
+// fotos?") con la misma matematica 3:4 del editor; precarga fechas adyacentes
+// para que el timelapse no parpadee. El numero solo fija cuantas vistas se
+// ven a la vez: con 1 la lista de vistas se desplaza en horizontal y con 2 o
+// mas las flechas deslizan una ventana vista a vista (1-2, 2-3, 3-4...), asi
+// ninguna vista queda fuera de alcance.
 export default function Timeline({
   settings,
   views,
@@ -61,9 +62,19 @@ export default function Timeline({
   onOpenSettings: () => void;
   refreshKey: number;
 }) {
-  const [layout, setLayout] = useState(settings.default_layout);
+  const clampCount = (n: number, total: number) =>
+    Math.max(1, Math.min(4, Math.min(total, Math.round(n) || 1)));
+  const [count, setCount] = useState(() =>
+    clampCount(settings.photos_per_view, Math.max(1, views.length)),
+  );
   const [singleViewId, setSingleViewId] = useState<string | null>(null);
-  const [dualStart, setDualStart] = useState(0);
+  const [winStart, setWinStart] = useState(0);
+
+  // Si el ajuste cambia en Ajustes, el timeline lo refleja al instante.
+  useEffect(() => {
+    setCount(clampCount(settings.photos_per_view, Math.max(1, views.length)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings.photos_per_view]);
   const [photos, setPhotos] = useState<Map<string, Photo>>(new Map());
   const [urls, setUrls] = useState<Map<string, string>>(new Map());
   const [showGuides, setShowGuides] = useState(true);
@@ -71,16 +82,21 @@ export default function Timeline({
 
   const current: CheckIn | null = checkIns[index] ?? null;
 
-  // Ventana deslizante del modo 2: nunca deja fuera vistas del final;
-  // se clampa si se borran vistas para no quedar fuera de rango.
-  const maxDualStart = Math.max(0, views.length - 2);
-  const curDualStart = Math.min(dualStart, maxDualStart);
+  // Ventana deslizante: nunca deja fuera vistas del final; se clampa si se
+  // borran vistas o cambia el numero de fotos para no quedar fuera de rango.
+  const maxWinStart = Math.max(0, views.length - count);
+  const curWinStart = Math.min(winStart, maxWinStart);
 
   const shownViews = useMemo(() => {
-    if (layout === "dual" && views.length >= 2) return views.slice(curDualStart, curDualStart + 2);
+    if (count >= 2 && views.length >= 2) {
+      return views.slice(curWinStart, curWinStart + count);
+    }
     const chosen = views.find((v) => v.id === singleViewId) ?? views[0];
     return chosen ? [chosen] : [];
-  }, [layout, views, singleViewId, curDualStart]);
+  }, [count, views, singleViewId, curWinStart]);
+
+  // Botones 1..4 del selector rapido, limitados a las vistas disponibles.
+  const countOptions = [1, 2, 3, 4].filter((n) => n <= Math.max(1, views.length));
 
   useEffect(() => {
     let cancelled = false;
@@ -241,23 +257,24 @@ export default function Timeline({
         </div>
       </header>
 
-      <div className="flex items-center justify-center gap-2 px-3 pt-3 pb-1">
-        {views.length > 1 && (
+      <div className="flex flex-wrap items-center justify-center gap-2 px-3 pt-3 pb-1">
+        {views.length > 1 && countOptions.length > 1 && (
           <div className="flex shrink-0 rounded-full bg-zinc-900 p-1 ring-1 ring-white/10">
-            {(["single", "dual"] as const).map((l, i) => (
+            {countOptions.map((n) => (
               <button
-                key={l}
-                onClick={() => setLayout(l)}
+                key={n}
+                onClick={() => setCount(n)}
+                aria-label={`Ver ${n} foto${n > 1 ? "s" : ""} a la vez`}
                 className={`h-11 w-11 rounded-full text-xs font-semibold transition ${
-                  layout === l ? "bg-lime-400 text-black" : "text-zinc-400"
+                  count === n ? "bg-lime-400 text-black" : "text-zinc-400"
                 }`}
               >
-                {i + 1}
+                {n}
               </button>
             ))}
           </div>
         )}
-        {layout === "single" && views.length > 1 && (
+        {count === 1 && views.length > 1 && (
           // La fila de vistas se desplaza en horizontal: con muchas vistas
           // ninguna queda cortada fuera de la pantalla.
           <div className="flex min-w-0 flex-1 overflow-x-auto rounded-full bg-zinc-900 p-1 ring-1 ring-white/10 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -278,24 +295,25 @@ export default function Timeline({
             </div>
           </div>
         )}
-        {layout === "dual" && views.length > 2 && (
-          // Con mas de 2 vistas, las flechas recorren el catalogo por
-          // parejas: el modo 2 limita cuantas se ven a la vez, no cuales.
+        {count >= 2 && views.length > count && (
+          // Con mas vistas que huecos, las flechas deslizan la ventana vista
+          // a vista (1-2, 2-3, 3-4...): el numero limita cuantas se ven a la
+          // vez, no cuales se pueden alcanzar.
           <div className="flex shrink-0 items-center rounded-full bg-zinc-900 p-1 ring-1 ring-white/10">
             <button
-              onClick={() => setDualStart((s) => Math.max(0, s - 1))}
-              disabled={curDualStart <= 0}
+              onClick={() => setWinStart((s) => Math.max(0, s - 1))}
+              disabled={curWinStart <= 0}
               aria-label="Vistas anteriores"
               className="flex h-11 w-11 items-center justify-center rounded-full text-zinc-400 transition active:scale-95 disabled:opacity-30"
             >
               <IconChevronL />
             </button>
             <span className="px-1 text-xs font-medium text-zinc-400 tabular-nums">
-              {curDualStart + 1}-{Math.min(curDualStart + 2, views.length)}/{views.length}
+              {curWinStart + 1}-{Math.min(curWinStart + count, views.length)}/{views.length}
             </span>
             <button
-              onClick={() => setDualStart((s) => Math.min(maxDualStart, s + 1))}
-              disabled={curDualStart >= maxDualStart}
+              onClick={() => setWinStart((s) => Math.min(maxWinStart, s + 1))}
+              disabled={curWinStart >= maxWinStart}
               aria-label="Vistas siguientes"
               className="flex h-11 w-11 items-center justify-center rounded-full text-zinc-400 transition active:scale-95 disabled:opacity-30"
             >
@@ -316,7 +334,13 @@ export default function Timeline({
 
       <main
         className={`grid flex-1 content-center gap-3 px-3 pt-2 pb-4 ${
-          shownViews.length === 2 ? "grid-cols-2" : "mx-auto w-full max-w-md grid-cols-1"
+          shownViews.length === 4
+            ? "mx-auto w-full max-w-md grid-cols-2 grid-rows-2"
+            : shownViews.length === 3
+              ? "grid-cols-3"
+              : shownViews.length === 2
+                ? "grid-cols-2"
+                : "mx-auto w-full max-w-md grid-cols-1"
         }`}
       >
         {shownViews.map((v) => {

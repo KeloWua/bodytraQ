@@ -205,19 +205,27 @@ export default function SettingsSheet({
         </Section>
 
         <Section title="Timeline">
+          <label className="mb-1.5 block text-xs text-zinc-400">
+            ¿Cómo quieres ver tus fotos?
+          </label>
           <div className="mb-1 flex rounded-full bg-zinc-800 p-1 ring-1 ring-white/10">
-            {(["single", "dual"] as const).map((l) => (
-              <button
-                key={l}
-                onClick={() => onChangeSettings({ default_layout: l })}
-                className={`min-h-11 flex-1 rounded-full py-2 text-sm font-semibold transition ${
-                  settings.default_layout === l ? "bg-lime-400 text-black" : "text-zinc-400"
-                }`}
-              >
-                {l === "single" ? "1 foto" : "2 fotos"}
-              </button>
-            ))}
+            {[1, 2, 3, 4]
+              .filter((n) => n <= Math.max(1, views.length))
+              .map((n) => (
+                <button
+                  key={n}
+                  onClick={() => onChangeSettings({ photos_per_view: n })}
+                  className={`min-h-11 flex-1 rounded-full py-2 text-sm font-semibold transition ${
+                    settings.photos_per_view === n ? "bg-lime-400 text-black" : "text-zinc-400"
+                  }`}
+                >
+                  {n} foto{n > 1 ? "s" : ""}
+                </button>
+              ))}
           </div>
+          <p className="mb-2 text-xs text-zinc-500">
+            Fotos a la vez en el timeline (máx. 4); con flechas recorres el resto.
+          </p>
           <Switch
             checked={settings.show_date}
             onChange={(v) => onChangeSettings({ show_date: v })}
