@@ -423,13 +423,6 @@ export default function Timeline({
           >
             <IconChevronR />
           </button>
-          <button
-            onClick={onOpenSettings}
-            aria-label="Ajustes"
-            className="flex h-12 w-12 items-center justify-center rounded-full bg-zinc-900 ring-1 ring-white/10 text-zinc-300 transition active:scale-95"
-          >
-            <IconGear />
-          </button>
         </div>
       </nav>
     </div>

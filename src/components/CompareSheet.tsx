@@ -158,11 +158,11 @@ export default function CompareSheet({
       if (!el) return;
       const rect = el.getBoundingClientRect();
       const startX = e.clientX;
+      const initialX = dividerX; // Capturar posición inicial
 
       const onMove = (clientX: number) => {
         const dx = clientX - startX;
-        const normX = dx / rect.width;
-        setDividerX((prev) => Math.max(0, Math.min(1, prev + normX)));
+        setDividerX(Math.max(0, Math.min(1, initialX + dx / rect.width)));
       };
 
       const onPointerMove = (ev: PointerEvent) => {
@@ -177,7 +177,7 @@ export default function CompareSheet({
       document.addEventListener("pointermove", onPointerMove);
       document.addEventListener("pointerup", onPointerUp);
     },
-    [],
+    [dividerX],
   );
 
   // Zoom con botones
@@ -226,6 +226,7 @@ export default function CompareSheet({
   const handleTouchStart = useCallback(
     (e: React.TouchEvent) => {
       if (e.touches.length === 2) {
+        panStart.current = null; // Anular pan para que no pelee con pinch
         const dx = e.touches[0].clientX - e.touches[1].clientX;
         const dy = e.touches[0].clientY - e.touches[1].clientY;
         pinchStart.current = { dist: Math.sqrt(dx * dx + dy * dy), zoom: { ...zoom } };
@@ -251,12 +252,13 @@ export default function CompareSheet({
 
   // Selector de fecha con flechas
   const dateIndex = (date: string) => availableDates.indexOf(date);
-  const cycleDate = (date: string, dir: number) => {
+  const cycleDate = (which: "A" | "B", dir: number) => {
+    const date = which === "A" ? dateA : dateB;
     const idx = dateIndex(date);
     const newIdx = Math.max(0, Math.min(availableDates.length - 1, idx + dir));
     const newDate = availableDates[newIdx];
-    if (newDate === dateA) setDateA(newDate);
-    if (newDate === dateB) setDateB(newDate);
+    if (which === "A") setDateA(newDate);
+    else setDateB(newDate);
   };
 
   const viewName = views.find((v) => v.id === viewId)?.name ?? "";
@@ -298,7 +300,7 @@ export default function CompareSheet({
       <div className="flex items-center justify-center gap-6 px-4 py-2">
         <div className="flex items-center gap-2">
           <button
-            onClick={() => cycleDate(dateA, -1)}
+            onClick={() => cycleDate("A", -1)}
             disabled={dateIndex(dateA) <= 0}
             className="flex h-9 w-9 items-center justify-center rounded-full text-zinc-400 disabled:opacity-30"
             aria-label="Fecha anterior A"
@@ -309,7 +311,7 @@ export default function CompareSheet({
             {dateA ? new Date(dateA + "T12:00:00").toLocaleDateString("es-ES", { day: "2-digit", month: "short" }) : "—"}
           </span>
           <button
-            onClick={() => cycleDate(dateA, 1)}
+            onClick={() => cycleDate("A", 1)}
             disabled={dateIndex(dateA) >= availableDates.length - 1}
             className="flex h-9 w-9 items-center justify-center rounded-full text-zinc-400 disabled:opacity-30"
             aria-label="Fecha siguiente A"
@@ -320,7 +322,7 @@ export default function CompareSheet({
         <span className="text-xs text-zinc-500">vs</span>
         <div className="flex items-center gap-2">
           <button
-            onClick={() => cycleDate(dateB, -1)}
+            onClick={() => cycleDate("B", -1)}
             disabled={dateIndex(dateB) <= 0}
             className="flex h-9 w-9 items-center justify-center rounded-full text-zinc-400 disabled:opacity-30"
             aria-label="Fecha anterior B"
@@ -331,7 +333,7 @@ export default function CompareSheet({
             {dateB ? new Date(dateB + "T12:00:00").toLocaleDateString("es-ES", { day: "2-digit", month: "short" }) : "—"}
           </span>
           <button
-            onClick={() => cycleDate(dateB, 1)}
+            onClick={() => cycleDate("B", 1)}
             disabled={dateIndex(dateB) >= availableDates.length - 1}
             className="flex h-9 w-9 items-center justify-center rounded-full text-zinc-400 disabled:opacity-30"
             aria-label="Fecha siguiente B"
@@ -355,6 +357,8 @@ export default function CompareSheet({
             {availableDates.length < 2 ? "Necesitas al menos 2 fechas con foto en esta vista" : "Cargando…"}
           </div>
         ) : (
+          <>            
+          {/* Capa A: siempre visible completa */}
           <div
             className="absolute inset-0"
             style={{
@@ -362,7 +366,6 @@ export default function CompareSheet({
               transformOrigin: "center center",
             }}
           >
-            {/* Capa A: siempre visible completa */}
             <div className="absolute inset-0">
               <AlignedPhoto
                 srcUrl={photoA.url}
@@ -370,10 +373,19 @@ export default function CompareSheet({
                 showGuides={false}
               />
             </div>
-            {/* Capa B: recortada por clip-path */}
+          </div>
+
+          {/* Capa B: wrapper sin transform con clip-path, dentro tiene el mismo transform */}
+          <div
+            className="absolute inset-0"
+            style={{ clipPath: `inset(0 ${100 - dividerX * 100}% 0 0)` }}
+          >
             <div
               className="absolute inset-0"
-              style={{ clipPath: `inset(0 0 0 ${dividerX * 100}%)` }}
+              style={{
+                transform: `translate(${zoom.offset_x * 100}%, ${zoom.offset_y * 100}%) scale(${zoom.scale})`,
+                transformOrigin: "center center",
+              }}
             >
               <AlignedPhoto
                 srcUrl={photoB.url}
@@ -381,19 +393,20 @@ export default function CompareSheet({
                 showGuides={false}
               />
             </div>
-            {/* Divisor arrastrable */}
-            <div
-              ref={dividerRef}
-              className="absolute top-0 bottom-0 w-1 bg-lime-400 cursor-col-resize"
-              style={{ left: `${dividerX * 100}%`, transform: "translateX(-50%)" }}
-              onPointerDown={handleDividerPointerDown}
-            >
-              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-10 w-8 rounded-full bg-lime-400 ring-2 ring-white shadow-lg flex items-center justify-center">
-                <div className="w-0.5 h-4 bg-black rounded-full" />
-              </div>
+          </div>
+
+          {/* Divisor arrastrable — fuera del transform, fijo a pantalla */}
+          <div
+            ref={dividerRef}
+            className="absolute top-0 bottom-0 w-1 bg-lime-400 cursor-col-resize"
+            style={{ left: `${dividerX * 100}%`, transform: "translateX(-50%)" }}
+            onPointerDown={handleDividerPointerDown}
+          >
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-10 w-8 rounded-full bg-lime-400 ring-2 ring-white shadow-lg flex items-center justify-center">
+              <div className="w-0.5 h-4 bg-black rounded-full" />
             </div>
           </div>
-        )}
+          </>
 
         {/* Etiquetas de fecha en las esquinas */}
         {photoA && photoB && (
