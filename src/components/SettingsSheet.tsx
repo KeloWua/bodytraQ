@@ -178,6 +178,22 @@ export default function SettingsSheet({
           </div>
         )}
 
+        <Section title="Apariencia">
+          <div className="flex rounded-full bg-zinc-800 p-1 ring-1 ring-white/10">
+            {(["dark", "light"] as const).map((t) => (
+              <button
+                key={t}
+                onClick={() => onChangeSettings({ theme: t })}
+                className={`min-h-11 flex-1 rounded-full py-2 text-sm font-semibold transition ${
+                  settings.theme === t ? "bg-lime-400 text-black" : "text-zinc-400"
+                }`}
+              >
+                {t === "dark" ? "Oscuro" : "Claro"}
+              </button>
+            ))}
+          </div>
+        </Section>
+
         <Section title="Cuerpo">
           <label className="mb-1.5 block text-xs text-zinc-400">Altura (cm, para el IMC)</label>
           <input

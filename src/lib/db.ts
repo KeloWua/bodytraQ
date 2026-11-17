@@ -14,6 +14,7 @@ export interface Settings {
   active_view_ids: string[];
   keep_original: boolean;
   schema_version: number;
+  theme: "dark" | "light";
 }
 
 export interface ViewProfile {
@@ -136,6 +137,7 @@ export function defaultSettings(): Settings {
     active_view_ids: [],
     keep_original: false,
     schema_version: SCHEMA_VERSION,
+    theme: "dark",
   };
 }
 
@@ -189,7 +191,9 @@ export async function getSettings(): Promise<Settings> {
     ppv = legacy === "single" ? 1 : 2;
   }
   ppv = Math.min(4, Math.max(1, Math.round(ppv)));
-  return { ...s, photos_per_view: ppv };
+  // Migracion perezosa de theme: si no existe o no es valido, usar "dark".
+  const theme = (s.theme === "light" ? "light" : "dark") as "dark" | "light";
+  return { ...s, photos_per_view: ppv, theme };
 }
 
 export async function activeViews(): Promise<ViewProfile[]> {

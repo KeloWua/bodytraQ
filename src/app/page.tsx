@@ -109,6 +109,13 @@ export default function Page() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
+  // Aplicar tema (oscuro/claro) al cambiar settings.
+  useEffect(() => {
+    const isLight = settings.theme === "light";
+    document.documentElement.classList.toggle("light", isLight);
+    localStorage.setItem("bt-theme", isLight ? "light" : "dark");
+  }, [settings.theme]);
+
   const reload = useCallback(async () => {
     const [s, v, c] = await Promise.all([getSettings(), activeViews(), listCheckIns()]);
     setSettings(s);
