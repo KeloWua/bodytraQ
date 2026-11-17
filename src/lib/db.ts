@@ -5,7 +5,9 @@ export interface Settings {
   id: string; // siempre 'current'
   height_cm: number | null;
   weight_unit: "kg" | "lb";
-  default_layout: "single" | "dual";
+  // Fotos simultaneas en el timeline (1 a 4). Sustituye al antiguo
+  // default_layout "single"|"dual"; getSettings migra el valor viejo.
+  photos_per_view: number;
   show_date: boolean;
   show_weight: boolean;
   show_bmi: boolean;
@@ -127,7 +129,7 @@ export function defaultSettings(): Settings {
     id: "current",
     height_cm: null,
     weight_unit: "kg",
-    default_layout: "dual",
+    photos_per_view: 2,
     show_date: true,
     show_weight: true,
     show_bmi: false,
@@ -177,7 +179,17 @@ export async function ensureSeed(): Promise<void> {
 }
 
 export async function getSettings(): Promise<Settings> {
-  return (await db.settings.get("current")) ?? defaultSettings();
+  const s = (await db.settings.get("current")) ?? defaultSettings();
+  // Migracion perezosa: las instalaciones anteriores guardaban
+  // default_layout "single"|"dual" y ningun photos_per_view. Tambien
+  // cubre backups antiguos restaurados, que llegan con el campo viejo.
+  const legacy = (s as { default_layout?: unknown }).default_layout;
+  let ppv = s.photos_per_view;
+  if (typeof ppv !== "number" || !Number.isFinite(ppv)) {
+    ppv = legacy === "single" ? 1 : 2;
+  }
+  ppv = Math.min(4, Math.max(1, Math.round(ppv)));
+  return { ...s, photos_per_view: ppv };
 }
 
 export async function activeViews(): Promise<ViewProfile[]> {
