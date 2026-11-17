@@ -10,6 +10,7 @@ import {
   IconCamera,
   IconChevronL,
   IconChevronR,
+  IconCompare,
   IconGear,
   IconGuides,
   IconPencil,
@@ -45,6 +46,7 @@ export default function Timeline({
   onNewCheckIn,
   onEditCheckIn,
   onMoveToTrash,
+  onOpenCompare,
   onOpenSettings,
   refreshKey,
 }: {
@@ -59,6 +61,7 @@ export default function Timeline({
   onNewCheckIn: () => void;
   onEditCheckIn: () => void;
   onMoveToTrash: (id: string) => void;
+  onOpenCompare: () => void;
   onOpenSettings: () => void;
   refreshKey: number;
 }) {
@@ -389,6 +392,14 @@ export default function Timeline({
 
       <nav className="sticky bottom-0 z-20 border-t border-white/5 bg-zinc-950/80 backdrop-blur-md">
         <div className="flex items-center justify-between px-6 py-3">
+          <button
+            onClick={onOpenCompare}
+            disabled={checkIns.length < 2}
+            aria-label="Comparar fechas"
+            className="flex h-12 w-12 items-center justify-center rounded-full bg-zinc-900 ring-1 ring-white/10 text-zinc-300 transition active:scale-95 disabled:opacity-30"
+          >
+            <IconCompare />
+          </button>
           <button
             onClick={() => go(-1)}
             disabled={index <= 0}

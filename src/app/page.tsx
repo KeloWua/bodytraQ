@@ -34,6 +34,7 @@ import { hasSession, lock, protectionEnabled } from "@/lib/crypto";
 import PhotoAligner from "@/components/PhotoAligner";
 import GuideEditor from "@/components/GuideEditor";
 import CameraCapture from "@/components/CameraCapture";
+import CompareSheet from "@/components/CompareSheet";
 import { IconCamera, IconPhoto } from "@/components/icons";
 
 type Modal =
@@ -45,7 +46,8 @@ type Modal =
   | { kind: "camera"; checkInId: string; viewId: string }
   | { kind: "align"; checkInId: string; viewId: string; file: File }
   | { kind: "realign"; photo: Photo }
-  | { kind: "guides"; view: ViewProfile };
+  | { kind: "guides"; view: ViewProfile }
+  | { kind: "compare" };
 
 // Toast de deshacer tras mover a papelera.
 interface UndoToast {
@@ -366,6 +368,7 @@ export default function Page() {
         onNewCheckIn={() => setModal({ kind: "checkin" })}
         onEditCheckIn={() => current && setModal({ kind: "checkin", editing: current })}
         onMoveToTrash={(id) => current && current.id === id && handleMoveToTrash(id)}
+        onOpenCompare={() => setModal({ kind: "compare" })}
         onOpenSettings={() => setModal({ kind: "settings" })}
         refreshKey={refreshKey}
       />
@@ -632,6 +635,14 @@ export default function Page() {
             setRefreshKey((k) => k + 1);
           }}
           onCancel={() => setModal({ kind: "settings" })}
+        />
+      )}
+
+      {modal.kind === "compare" && (
+        <CompareSheet
+          views={views}
+          checkIns={checkIns}
+          onClose={() => setModal({ kind: "none" })}
         />
       )}
     </>

@@ -62,6 +62,12 @@ export const IconTimer = (p: P) =>
     <path d="M12 7v5l3 3" />
   </>);
 
+export const IconCompare = (p: P) =>
+  base(p, <>
+    <rect x="3" y="3" width="10" height="10" rx="1" />
+    <rect x="11" y="11" width="10" height="10" rx="1" />
+  </>);
+
 export function IconLock({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className={className}>
