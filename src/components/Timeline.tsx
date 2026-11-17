@@ -10,11 +10,9 @@ import {
   IconCamera,
   IconChevronL,
   IconChevronR,
-  IconCompare,
   IconGear,
   IconGuides,
   IconPencil,
-  IconPlus,
   IconTrash,
 } from "./icons";
 
@@ -46,7 +44,6 @@ export default function Timeline({
   onNewCheckIn,
   onEditCheckIn,
   onMoveToTrash,
-  onOpenCompare,
   onOpenSettings,
   refreshKey,
 }: {
@@ -61,7 +58,6 @@ export default function Timeline({
   onNewCheckIn: () => void;
   onEditCheckIn: () => void;
   onMoveToTrash: (id: string) => void;
-  onOpenCompare: () => void;
   onOpenSettings: () => void;
   refreshKey: number;
 }) {
@@ -166,7 +162,7 @@ export default function Timeline({
 
   if (checkIns.length === 0) {
     return (
-      <div className="relative z-10 flex min-h-dvh flex-col items-center justify-center gap-5 p-8 text-center">
+      <div className="relative z-10 flex min-h-full flex-col items-center justify-center gap-5 p-8 text-center">
         <div className="flex h-20 w-20 items-center justify-center rounded-full bg-zinc-900 ring-1 ring-white/10">
           <IconCamera className="h-9 w-9 text-lime-400" />
         </div>
@@ -195,7 +191,7 @@ export default function Timeline({
 
   return (
     <div
-      className="relative z-10 flex min-h-dvh flex-col"
+      className="relative z-10 flex min-h-full flex-col"
       onPointerDown={(e) => {
         swipe.current = { x: e.clientX, y: e.clientY };
       }}
@@ -390,41 +386,6 @@ export default function Timeline({
         })}
       </main>
 
-      <nav className="sticky bottom-0 z-20 border-t border-white/5 bg-zinc-950/80 backdrop-blur-md">
-        <div className="flex items-center justify-between px-6 py-3">
-          <button
-            onClick={onOpenCompare}
-            disabled={checkIns.length < 2}
-            aria-label="Comparar fechas"
-            className="flex h-12 w-12 items-center justify-center rounded-full bg-zinc-900 ring-1 ring-white/10 text-zinc-300 transition active:scale-95 disabled:opacity-30"
-          >
-            <IconCompare />
-          </button>
-          <button
-            onClick={() => go(-1)}
-            disabled={index <= 0}
-            aria-label="Fecha anterior"
-            className="flex h-12 w-12 items-center justify-center rounded-full bg-zinc-900 ring-1 ring-white/10 transition active:scale-95 disabled:opacity-30"
-          >
-            <IconChevronL />
-          </button>
-          <button
-            onClick={onNewCheckIn}
-            className="flex items-center gap-2 rounded-full bg-lime-400 px-6 py-3.5 text-sm font-bold text-black shadow-lg shadow-lime-400/25 transition active:scale-95"
-          >
-            <IconPlus className="h-4 w-4" />
-            Nuevo registro
-          </button>
-          <button
-            onClick={() => go(1)}
-            disabled={index >= checkIns.length - 1}
-            aria-label="Fecha siguiente"
-            className="flex h-12 w-12 items-center justify-center rounded-full bg-zinc-900 ring-1 ring-white/10 transition active:scale-95 disabled:opacity-30"
-          >
-            <IconChevronR />
-          </button>
-        </div>
-      </nav>
     </div>
   );
 }

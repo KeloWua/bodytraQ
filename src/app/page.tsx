@@ -35,7 +35,8 @@ import PhotoAligner from "@/components/PhotoAligner";
 import GuideEditor from "@/components/GuideEditor";
 import CameraCapture from "@/components/CameraCapture";
 import CompareSheet from "@/components/CompareSheet";
-import { IconCamera, IconPhoto } from "@/components/icons";
+import BottomNav from "@/components/BottomNav";
+import { IconCamera, IconChart, IconPhoto, IconPlus } from "@/components/icons";
 
 type Modal =
   | { kind: "none" }
@@ -55,6 +56,8 @@ interface UndoToast {
   toastId: number; // identificador unico para comparar en setTimeout
 }
 
+type Tab = "fotos" | "evolucion";
+
 export default function Page() {
   const [ready, setReady] = useState(false);
   const [locked, setLocked] = useState(false);
@@ -65,6 +68,7 @@ export default function Page() {
   const [views, setViews] = useState<ViewProfile[]>([]);
   const [checkIns, setCheckIns] = useState<CheckIn[]>([]);
   const [index, setIndex] = useState(0);
+  const [tab, setTab] = useState<Tab>("fotos");
   const [modal, setModal] = useState<Modal>({ kind: "none" });
   const [refreshKey, setRefreshKey] = useState(0);
   const [realign, setRealign] = useState<{ previewUrl: string } | null>(null);
@@ -86,6 +90,24 @@ export default function Page() {
   const toastCounter = useRef(0);
   const fileRef = useRef<HTMLInputElement>(null);
   const pendingView = useRef<string | null>(null);
+
+  // Hook de ocultación de barra inferior al hacer scroll hacia abajo.
+  const [navHidden, setNavHidden] = useState(false);
+  const scrollYRef = useRef(0);
+  useEffect(() => {
+    const onScroll = () => {
+      const y = window.scrollY ?? 0;
+      const delta = y - scrollYRef.current;
+      if (delta > 8 && y > 48) {
+        setNavHidden(true);
+      } else if (delta < -8 || y < 8) {
+        setNavHidden(false);
+      }
+      scrollYRef.current = y;
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
 
   const reload = useCallback(async () => {
     const [s, v, c] = await Promise.all([getSettings(), activeViews(), listCheckIns()]);
@@ -351,27 +373,94 @@ export default function Page() {
     return <LockScreen onUnlocked={handleUnlocked} />;
   }
 
+  const go = (delta: number) => {
+    const next = Math.min(checkIns.length - 1, Math.max(0, index + delta));
+    if (next !== index) setIndex(next);
+  };
+
   return (
-    <>
-      <Timeline
-        settings={settings}
-        views={views}
-        checkIns={checkIns}
-        index={index}
-        storageOk={storageOk}
-        onIndex={setIndex}
-        onAddPhoto={(viewId) => {
-          if (!current) return;
-          setModal({ kind: "addchoice", viewId });
-        }}
-        onEditPhoto={(photo) => setModal({ kind: "realign", photo })}
-        onNewCheckIn={() => setModal({ kind: "checkin" })}
-        onEditCheckIn={() => current && setModal({ kind: "checkin", editing: current })}
-        onMoveToTrash={(id) => current && current.id === id && handleMoveToTrash(id)}
-        onOpenCompare={() => setModal({ kind: "compare" })}
-        onOpenSettings={() => setModal({ kind: "settings" })}
-        refreshKey={refreshKey}
-      />
+    <div className="flex min-h-dvh flex-col">
+      <div className="flex-1 flex flex-col">
+        {tab === "fotos" && (
+          <Timeline
+            settings={settings}
+            views={views}
+            checkIns={checkIns}
+            index={index}
+            storageOk={storageOk}
+            onIndex={setIndex}
+            onAddPhoto={(viewId) => {
+              if (!current) return;
+              setModal({ kind: "addchoice", viewId });
+            }}
+            onEditPhoto={(photo) => setModal({ kind: "realign", photo })}
+            onNewCheckIn={() => setModal({ kind: "checkin" })}
+            onEditCheckIn={() => current && setModal({ kind: "checkin", editing: current })}
+            onMoveToTrash={(id) => current && current.id === id && handleMoveToTrash(id)}
+            onOpenSettings={() => setModal({ kind: "settings" })}
+            refreshKey={refreshKey}
+          />
+        )}
+        {tab === "evolucion" && (
+          <div className="flex min-h-full flex-col items-center justify-center gap-4 p-8 text-center">
+            <IconChart className="h-16 w-16 text-zinc-600" />
+            <h2 className="text-xl font-bold tracking-tight">Evolución</h2>
+            <p className="text-sm text-zinc-400">Próximamente: gráficas de tu progreso.</p>
+          </div>
+        )}
+      </div>
+
+      {/* Footer sticky: nav contextual + barra de pestañas */}
+      <footer
+        className={`sticky bottom-0 z-30 transition-transform duration-200 ${
+          navHidden ? "translate-y-full" : ""
+        }`}
+      >
+        {/* Fila contextual: solo en Fotos y con registros */}
+        {tab === "fotos" && checkIns.length > 0 && (
+          <div className="flex items-center justify-between border-t border-white/5 bg-zinc-950/80 backdrop-blur-md px-4 py-2">
+            <button
+              onClick={() => go(-1)}
+              disabled={index <= 0}
+              aria-label="Fecha anterior"
+              className="flex h-12 w-12 items-center justify-center rounded-full bg-zinc-900 ring-1 ring-white/10 transition active:scale-95 disabled:opacity-30"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
+                <path d="m15 18-6-6 6-6" />
+              </svg>
+            </button>
+            <button
+              onClick={() => setModal({ kind: "checkin" })}
+              className="flex items-center gap-2 rounded-full bg-lime-400 px-6 py-3.5 text-sm font-bold text-black shadow-lg shadow-lime-400/25 transition active:scale-95"
+            >
+              <IconPlus className="h-4 w-4" />
+              Nuevo registro
+            </button>
+            <button
+              onClick={() => go(1)}
+              disabled={index >= checkIns.length - 1}
+              aria-label="Fecha siguiente"
+              className="flex h-12 w-12 items-center justify-center rounded-full bg-zinc-900 ring-1 ring-white/10 transition active:scale-95 disabled:opacity-30"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
+                <path d="m9 18 6-6-6-6" />
+              </svg>
+            </button>
+          </div>
+        )}
+        {/* Fila de pestañas */}
+        <div className="pb-[env(safe-area-inset-bottom)]">
+          <BottomNav
+            tab={tab === "fotos" ? "fotos" : "evolucion"}
+            onTab={(t) => {
+              if (t === "fotos" || t === "evolucion") setTab(t);
+            }}
+            onOpenCompare={() => setModal({ kind: "compare" })}
+            onOpenSettings={() => setModal({ kind: "settings" })}
+            compareDisabled={checkIns.length < 2}
+          />
+        </div>
+      </footer>
 
       <input
         ref={fileRef}
@@ -645,7 +734,7 @@ export default function Page() {
           onClose={() => setModal({ kind: "none" })}
         />
       )}
-    </>
+    </div>
   );
 }
 
