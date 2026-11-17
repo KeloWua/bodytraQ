@@ -105,10 +105,9 @@ export default function CompareSheet({
         },
       });
     })();
-    return () => {
-      cancelled = true;
-      if (urlA) URL.revokeObjectURL(urlA);
-    };
+    // Las URLs las gestiona la cache de storage.ts (objectUrl).
+    // No revocar aquí: al cambiar fecha, objectUrl devuelve la URL cacheada.
+    return () => { cancelled = true; };
   }, [dateA, viewId, checkIns]);
 
   // Cargar foto B
@@ -136,19 +135,13 @@ export default function CompareSheet({
         },
       });
     })();
-    return () => {
-      cancelled = true;
-      if (urlB) URL.revokeObjectURL(urlB);
-    };
+    // Las URLs las gestiona la cache de storage.ts (objectUrl).
+    // No revocar aquí: al cambiar fecha, objectUrl devuelve la URL cacheada.
+    return () => { cancelled = true; };
   }, [dateB, viewId, checkIns]);
 
-  // Revocar URLs al cerrar
-  useEffect(() => {
-    return () => {
-      if (photoA?.url) URL.revokeObjectURL(photoA.url);
-      if (photoB?.url) URL.revokeObjectURL(photoB.url);
-    };
-  }, []);
+  // Las URLs las gestiona la cache de storage.ts (objectUrl).
+  // No se revocan: clearUrlCache al bloquear y revokeUrl(path) al sustituir foto.
 
   // Divisor arrastrable
   const handleDividerPointerDown = useCallback(
