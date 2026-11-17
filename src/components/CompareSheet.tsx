@@ -86,10 +86,10 @@ export default function CompareSheet({
     let urlA: string | null = null;
     (async () => {
       const ci = checkIns.find((c) => c.date === dateA);
-      if (!ci) return;
+      if (!ci) { setPhotoA(null); return; }
       const rows = await photosOf(ci.id);
       const photo = rows.find((p) => p.view_profile_id === viewId && !p.deleted_at);
-      if (!photo) return;
+      if (!photo) { setPhotoA(null); return; }
       const url = await objectUrl(photo.display_path);
       if (!url || cancelled) return;
       urlA = url;
@@ -117,10 +117,10 @@ export default function CompareSheet({
     let urlB: string | null = null;
     (async () => {
       const ci = checkIns.find((c) => c.date === dateB);
-      if (!ci) return;
+      if (!ci) { setPhotoB(null); return; }
       const rows = await photosOf(ci.id);
       const photo = rows.find((p) => p.view_profile_id === viewId && !p.deleted_at);
-      if (!photo) return;
+      if (!photo) { setPhotoB(null); return; }
       const url = await objectUrl(photo.display_path);
       if (!url || cancelled) return;
       urlB = url;
