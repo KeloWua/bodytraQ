@@ -36,7 +36,8 @@ import GuideEditor from "@/components/GuideEditor";
 import CameraCapture from "@/components/CameraCapture";
 import CompareSheet from "@/components/CompareSheet";
 import BottomNav from "@/components/BottomNav";
-import { IconCamera, IconChart, IconPhoto, IconPlus } from "@/components/icons";
+import EvolutionView from "@/components/EvolutionView";
+import { IconCamera, IconPhoto, IconPlus } from "@/components/icons";
 
 type Modal =
   | { kind: "none" }
@@ -409,11 +410,7 @@ export default function Page() {
           />
         )}
         {tab === "evolucion" && (
-          <div className="flex min-h-full flex-col items-center justify-center gap-4 p-8 text-center">
-            <IconChart className="h-16 w-16 text-zinc-600" />
-            <h2 className="text-xl font-bold tracking-tight">Evolución</h2>
-            <p className="text-sm text-zinc-400">Próximamente: gráficas de tu progreso.</p>
-          </div>
+          <EvolutionView checkIns={checkIns} settings={settings} />
         )}
       </div>
 
