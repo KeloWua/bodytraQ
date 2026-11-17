@@ -84,27 +84,39 @@ export default function DateSlider({
 
   const handlePointerDown = useCallback(
     (e: React.PointerEvent) => {
+      e.stopPropagation();
       const target = e.currentTarget;
       target.setPointerCapture(e.pointerId);
-      selectedRef.current = findNearest(e.clientX);
+      const nearest = findNearest(e.clientX);
+      selectedRef.current = nearest;
+      onSelect(nearest);
     },
-    [findNearest]
+    [findNearest, onSelect]
   );
 
   const handlePointerMove = useCallback(
     (e: React.PointerEvent) => {
+      e.stopPropagation();
+      // Only update while capture is active (selectedRef tracks this)
+      if (selectedRef.current === null) return;
       const nearest = findNearest(e.clientX);
       selectedRef.current = nearest;
+      onSelect(nearest);
     },
-    [findNearest]
+    [findNearest, onSelect]
   );
 
-  const handlePointerUp = useCallback(() => {
-    if (selectedRef.current !== null) {
-      onSelect(selectedRef.current);
-    }
-    selectedRef.current = null;
-  }, [onSelect]);
+  const handlePointerUp = useCallback(
+    (e: React.PointerEvent) => {
+      e.stopPropagation();
+      // Recalculate nearest from current pointer position
+      const nearest = findNearest(e.clientX);
+      selectedRef.current = nearest;
+      onSelect(nearest);
+      selectedRef.current = null;
+    },
+    [findNearest, onSelect]
+  );
 
   const handlePointerCancel = useCallback(() => {
     selectedRef.current = null;
@@ -153,13 +165,16 @@ export default function DateSlider({
 
         {/* Dots */}
         {positions.map((pos, i) => {
-          const leftPct = total === 1 ? 50 : pos * 100;
           const isActive = i === index;
+          // Align dots with track padding: 8px inset on each side
+          const leftStyle = total === 1
+            ? "50%"
+            : `calc(8px + (100% - 16px) * ${pos})`;
           return (
             <div
               key={i}
               className="absolute top-1/2 -translate-y-1/2"
-              style={{ left: `${leftPct}%`, transform: `translate(-50%, -50%)` }}
+              style={{ left: leftStyle, transform: `translate(-50%, -50%)` }}
             >
               <div
                 className={`rounded-full transition-all ${
