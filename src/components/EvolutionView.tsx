@@ -35,9 +35,10 @@ export default function EvolutionView({
   const points = useMemo(() => {
     const today = new Date();
     today.setUTCHours(0, 0, 0, 0);
+    const todayMs = today.getTime();
     const cutoffMs = range === "Todo"
       ? null
-      : Date.now() - (RANGES.find((r) => r.key === range)!.days ?? 0) * 24 * 60 * 60 * 1000;
+      : todayMs - (RANGES.find((r) => r.key === range)!.days ?? 0) * 24 * 60 * 60 * 1000;
 
     return checkIns
       .filter((c) => {
@@ -111,7 +112,7 @@ export default function EvolutionView({
         <div className="flex flex-1 flex-col items-center justify-center gap-4 text-center">
           <IconChart className="h-12 w-12 text-zinc-600" />
           <p className="text-sm text-zinc-400">
-            Aun no hay suficientes registros con peso en este periodo.
+            Aún no hay suficientes registros con peso en este periodo.
           </p>
         </div>
       ) : (
@@ -132,9 +133,9 @@ function WeightChart({
   points: { date: string; weightKg: number; ts: number }[];
   unit: "kg" | "lb";
 }) {
-  const pad = { top: 16, right: 16, bottom: 32, left: 40 };
-  const w = 600;
-  const h = 200;
+  const pad = { top: 16, right: 12, bottom: 36, left: 36 };
+  const w = 340;
+  const h = 220;
   const innerW = w - pad.left - pad.right;
   const innerH = h - pad.top - pad.bottom;
 
@@ -157,10 +158,10 @@ function WeightChart({
     return `${x(p.ts)},${y(v)}`;
   }).join(" ");
 
-  // Format date labels: d MMM (es)
+  // Format date labels: d MMM (es), UTC timezone
   const fmtDate = (ts: number) => {
     const d = new Date(ts);
-    return d.toLocaleDateString("es", { day: "numeric", month: "short" });
+    return d.toLocaleDateString("es", { day: "numeric", month: "short", timeZone: "UTC" });
   };
 
   const fmtAxis = (v: number) => {
@@ -201,7 +202,7 @@ function WeightChart({
           y={y(yMax) + 4}
           textAnchor="end"
           className="fill-zinc-500"
-          fontSize={10}
+          fontSize={11}
         >
           {fmtAxis(yMax)}
         </text>
@@ -210,7 +211,7 @@ function WeightChart({
           y={y(yMin) + 4}
           textAnchor="end"
           className="fill-zinc-500"
-          fontSize={10}
+          fontSize={11}
         >
           {fmtAxis(yMin)}
         </text>
@@ -218,19 +219,19 @@ function WeightChart({
         {/* X-axis date labels */}
         <text
           x={x(minTs)}
-          y={h - 8}
+          y={h - 10}
           textAnchor="start"
           className="fill-zinc-500"
-          fontSize={10}
+          fontSize={11}
         >
           {fmtDate(minTs)}
         </text>
         <text
           x={x(maxTs)}
-          y={h - 8}
+          y={h - 10}
           textAnchor="end"
           className="fill-zinc-500"
-          fontSize={10}
+          fontSize={11}
         >
           {fmtDate(maxTs)}
         </text>

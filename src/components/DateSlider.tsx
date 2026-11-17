@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef } from "react";
 import type { CheckIn } from "@/lib/db";
 
 export default function DateSlider({
@@ -12,8 +12,6 @@ export default function DateSlider({
   index: number;
   onSelect: (i: number) => void;
 }) {
-  if (checkIns.length === 0) return null;
-
   const total = checkIns.length;
 
   // Parse dates in UTC to avoid timezone shifts
@@ -31,10 +29,10 @@ export default function DateSlider({
 
   const firstTs = dates[0];
   const lastTs = dates[total - 1];
-  const spanDays = Math.max(1, Math.round((lastTs - firstTs) / (24 * 60 * 60 * 1000)));
 
   // Position each check-in by calendar distance from first
   const positions = useMemo(() => {
+    if (total === 0) return [];
     if (total === 1) return [0.5];
     return dates.map((ts) => (ts - firstTs) / (lastTs - firstTs || 1));
   }, [dates, firstTs, lastTs, total]);
@@ -48,54 +46,69 @@ export default function DateSlider({
     [dates, firstTs]
   );
 
-  // Short date: d MMM (es)
+  // Short date: d MMM (es), UTC timezone
   const shortDates = useMemo(() => {
     return dates.map((ts) => {
       const d = new Date(ts);
-      return d.toLocaleDateString("es", { day: "numeric", month: "short" });
+      return d.toLocaleDateString("es", { day: "numeric", month: "short", timeZone: "UTC" });
     });
   }, [dates]);
 
-  const [hovered, setHovered] = useState<number | null>(null);
+  // Ref for current positions so pointer handlers always read fresh values
+  const positionsRef = useRef(positions);
+  positionsRef.current = positions;
+
   const trackRef = useRef<HTMLDivElement>(null);
-  const [dragging, setDragging] = useState(false);
+  const selectedRef = useRef<number | null>(null);
+
+  const findNearest = useCallback((clientX: number): number => {
+    if (!trackRef.current) return 0;
+    const rect = trackRef.current.getBoundingClientRect();
+    // Track has internal padding: left-2 right-2 (0.5rem = 8px each side)
+    const padding = 8;
+    const trackWidth = rect.width - padding * 2;
+    const x = Math.max(0, Math.min(1, (clientX - rect.left - padding) / trackWidth));
+    const pos = positionsRef.current;
+    if (pos.length === 0) return 0;
+    let best = 0;
+    let bestDist = Infinity;
+    for (let i = 0; i < pos.length; i++) {
+      const d = Math.abs(pos[i] - x);
+      if (d < bestDist) {
+        bestDist = d;
+        best = i;
+      }
+    }
+    return best;
+  }, []);
 
   const handlePointerDown = useCallback(
     (e: React.PointerEvent) => {
-      setDragging(true);
-      (e.target as HTMLElement).setPointerCapture(e.pointerId);
-      handlePointerMove(e);
+      const target = e.currentTarget;
+      target.setPointerCapture(e.pointerId);
+      selectedRef.current = findNearest(e.clientX);
     },
-    // positions is stable; use a ref-based approach for positions
-    []
+    [findNearest]
   );
 
   const handlePointerMove = useCallback(
     (e: React.PointerEvent) => {
-      if (!trackRef.current) return;
-      const rect = trackRef.current.getBoundingClientRect();
-      const x = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-      // Find nearest point
-      let best = 0;
-      let bestDist = Infinity;
-      for (let i = 0; i < positions.length; i++) {
-        const d = Math.abs(positions[i] - x);
-        if (d < bestDist) {
-          bestDist = d;
-          best = i;
-        }
-      }
-      setHovered(best);
+      const nearest = findNearest(e.clientX);
+      selectedRef.current = nearest;
     },
-    [positions]
+    [findNearest]
   );
 
   const handlePointerUp = useCallback(() => {
-    setDragging(false);
-    if (hovered !== null) {
-      onSelect(hovered);
+    if (selectedRef.current !== null) {
+      onSelect(selectedRef.current);
     }
-  }, [hovered, onSelect]);
+    selectedRef.current = null;
+  }, [onSelect]);
+
+  const handlePointerCancel = useCallback(() => {
+    selectedRef.current = null;
+  }, []);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -111,11 +124,13 @@ export default function DateSlider({
   );
 
   // Current context label
-  const currentDay = dayLabels[index];
-  const currentDate = shortDates[index];
+  const currentDay = total > 0 ? dayLabels[index] : 1;
+  const currentDate = total > 0 ? shortDates[index] : "";
+
+  if (total === 0) return null;
 
   return (
-    <div className="flex flex-col gap-1.5">
+    <div className="flex min-w-0 flex-1 flex-col gap-1.5">
       {/* Track with dots */}
       <div
         ref={trackRef}
@@ -129,6 +144,7 @@ export default function DateSlider({
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerCancel}
         className="relative h-8 w-full cursor-pointer touch-none"
         style={{ touchAction: "none" }}
       >
@@ -139,19 +155,16 @@ export default function DateSlider({
         {positions.map((pos, i) => {
           const leftPct = total === 1 ? 50 : pos * 100;
           const isActive = i === index;
-          const isHovered = i === hovered;
           return (
             <div
               key={i}
-              className="absolute top-1/2 -translate-y-1/2 transition-transform"
+              className="absolute top-1/2 -translate-y-1/2"
               style={{ left: `${leftPct}%`, transform: `translate(-50%, -50%)` }}
             >
               <div
                 className={`rounded-full transition-all ${
                   isActive
                     ? "h-3 w-3 bg-lime-400 ring-2 ring-lime-400/50"
-                    : isHovered
-                    ? "h-2.5 w-2.5 bg-lime-400/80"
                     : "h-2 w-2 bg-zinc-500"
                 }`}
               />

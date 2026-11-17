@@ -425,7 +425,7 @@ export default function Page() {
         {tab === "fotos" && checkIns.length > 0 && (
           <div className="flex items-center border-t border-white/5 bg-zinc-950/80 backdrop-blur-md px-4 py-2">
             {settings.date_nav === "slider" ? (
-              <>
+              <div className="flex flex-1 items-center">
                 <DateSlider
                   checkIns={checkIns}
                   index={index}
@@ -438,7 +438,7 @@ export default function Page() {
                 >
                   <IconPlus className="h-5 w-5" />
                 </button>
-              </>
+              </div>
             ) : (
               <>
                 <div className="flex flex-1 items-center justify-between">
