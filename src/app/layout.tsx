@@ -19,6 +19,14 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="es">
+      <head>
+        {/* Aplicar tema antes del primer paint para evitar parpadeo */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `if(localStorage.getItem("bt-theme")==="light"){document.documentElement.classList.add("light")}`,
+          }}
+        />
+      </head>
       <body className="bg-neutral-950 text-white antialiased">
         {children}
         <SwRegister />

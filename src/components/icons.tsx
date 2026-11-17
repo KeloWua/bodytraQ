@@ -68,6 +68,15 @@ export const IconCompare = (p: P) =>
     <rect x="11" y="11" width="10" height="10" rx="1" />
   </>);
 
+export const IconChart = (p: P) =>
+  base(p, <>
+    <path d="M3 20h18" />
+    <path d="M6 16v4" />
+    <path d="M10 12v8" />
+    <path d="M14 8v12" />
+    <path d="M18 4v16" />
+  </>);
+
 export function IconLock({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className={className}>
