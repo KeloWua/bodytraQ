@@ -350,56 +350,59 @@ export default function CompareSheet({
             {availableDates.length < 2 ? "Necesitas al menos 2 fechas con foto en esta vista" : "Cargando…"}
           </div>
         ) : (
-          <>            
-          {/* Capa A: siempre visible completa */}
-          <div
-            className="absolute inset-0"
-            style={{
-              transform: `translate(${zoom.offset_x * 100}%, ${zoom.offset_y * 100}%) scale(${zoom.scale})`,
-              transformOrigin: "center center",
-            }}
-          >
-            <div className="absolute inset-0">
-              <AlignedPhoto
-                srcUrl={photoA.url}
-                transform={photoA.transform}
-                showGuides={false}
-              />
-            </div>
-          </div>
+          /* Contenedor acotado a la caja de la foto (mismo aspect y redondeo que AlignedPhoto) */
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="relative aspect-[3/4] w-full overflow-hidden rounded-2xl bg-zinc-900">
+              {/* Capa A: siempre visible completa */}
+              <div
+                className="absolute inset-0"
+                style={{
+                  transform: `translate(${zoom.offset_x * 100}%, ${zoom.offset_y * 100}%) scale(${zoom.scale})`,
+                  transformOrigin: "center center",
+                }}
+              >
+                <div className="absolute inset-0">
+                  <AlignedPhoto
+                    srcUrl={photoA.url}
+                    transform={photoA.transform}
+                    showGuides={false}
+                  />
+                </div>
+              </div>
 
-          {/* Capa B: wrapper sin transform con clip-path, dentro tiene el mismo transform */}
-          <div
-            className="absolute inset-0"
-            style={{ clipPath: `inset(0 0 0 ${dividerX * 100}%)` }}
-          >
-            <div
-              className="absolute inset-0"
-              style={{
-                transform: `translate(${zoom.offset_x * 100}%, ${zoom.offset_y * 100}%) scale(${zoom.scale})`,
-                transformOrigin: "center center",
-              }}
-            >
-              <AlignedPhoto
-                srcUrl={photoB.url}
-                transform={photoB.transform}
-                showGuides={false}
-              />
-            </div>
-          </div>
+              {/* Capa B: wrapper sin transform con clip-path, dentro tiene el mismo transform */}
+              <div
+                className="absolute inset-0"
+                style={{ clipPath: `inset(0 0 0 ${dividerX * 100}%)` }}
+              >
+                <div
+                  className="absolute inset-0"
+                  style={{
+                    transform: `translate(${zoom.offset_x * 100}%, ${zoom.offset_y * 100}%) scale(${zoom.scale})`,
+                    transformOrigin: "center center",
+                  }}
+                >
+                  <AlignedPhoto
+                    srcUrl={photoB.url}
+                    transform={photoB.transform}
+                    showGuides={false}
+                  />
+                </div>
+              </div>
 
-          {/* Divisor arrastrable — fuera del transform, fijo a pantalla */}
-          <div
-            ref={dividerRef}
-            className="absolute top-0 bottom-0 w-1 bg-lime-400 cursor-col-resize"
-            style={{ left: `${dividerX * 100}%`, transform: "translateX(-50%)" }}
-            onPointerDown={handleDividerPointerDown}
-          >
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-10 w-8 rounded-full bg-lime-400 ring-2 ring-white shadow-lg flex items-center justify-center">
-              <div className="w-0.5 h-4 bg-black rounded-full" />
+              {/* Divisor arrastrable — fuera del transform, fijo dentro de la caja de la foto */}
+              <div
+                ref={dividerRef}
+                className="absolute top-0 bottom-0 w-1 bg-lime-400 cursor-col-resize"
+                style={{ left: `${dividerX * 100}%`, transform: "translateX(-50%)" }}
+                onPointerDown={handleDividerPointerDown}
+              >
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-10 w-8 rounded-full bg-lime-400 ring-2 ring-white shadow-lg flex items-center justify-center">
+                  <div className="w-0.5 h-4 bg-black rounded-full" />
+                </div>
+              </div>
             </div>
           </div>
-          </>
         )}
 
         {/* Etiquetas de fecha en las esquinas */}
