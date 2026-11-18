@@ -249,9 +249,13 @@ export default function Timeline({
             <div className="text-sm font-semibold">{fmtDate(current.date, spansMultipleYears(checkIns.map((c) => c.date)))}</div>
           )}
           <div className="text-xs text-zinc-400 tabular-nums">
-            {settings.show_weight && weightLabel()}
-            {settings.show_weight && settings.show_bmi && weightLabel() && bmiLabel() ? " · " : ""}
-            {settings.show_bmi && bmiLabel()}
+            {[
+              settings.show_weight ? weightLabel() : null,
+              settings.show_bmi ? bmiLabel() : null,
+              current?.waist_cm != null ? `Cintura ${current.waist_cm} cm` : null,
+            ]
+              .filter(Boolean)
+              .join(" · ")}
           </div>
         </div>
       </header>
