@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import type { CheckIn, Settings } from "@/lib/db";
 import { IconChart } from "./icons";
-import { MEASUREMENT_FIELDS, bmi, spansMultipleYears, type MeasurementKey } from "@/lib/utils";
+import { MEASUREMENT_FIELDS, bmi, fmtDate, spansMultipleYears, type MeasurementKey } from "@/lib/utils";
 
 type RangeKey = "1M" | "3M" | "6M" | "1A" | "Todo";
 type MetricKey = "weight" | MeasurementKey;
@@ -156,7 +156,9 @@ export default function EvolutionView({
         <div className="flex flex-1 flex-col items-center justify-center gap-4 text-center">
           <IconChart className="h-12 w-12 text-zinc-600" />
           <p className="text-sm text-zinc-400">
-            Aún no hay suficientes registros con {metricLabel.toLowerCase()} en este periodo.
+            {points.length === 1
+              ? `Solo hay un registro con ${metricLabel.toLowerCase()} en este periodo (${fmtDate(points[0].date, spansMultipleYears(checkIns.map((c) => c.date)))}). Registra otro para ver la tendencia.`
+              : `Aún no hay registros con ${metricLabel.toLowerCase()} en este periodo.`}
           </p>
         </div>
       ) : (
