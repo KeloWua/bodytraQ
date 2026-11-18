@@ -1,5 +1,5 @@
 import Dexie, { type EntityTable } from "dexie";
-import { nowISO, todayISO, uuid } from "./utils";
+import { MEASUREMENT_FIELDS, nowISO, todayISO, uuid, type CheckInMeasurements } from "./utils";
 
 export interface Settings {
   id: string; // siempre 'current'
@@ -34,6 +34,13 @@ export interface CheckIn {
   active_key: string; // para activos = date; para papelera = `${date}#deleted#${id}`
   weight_kg: number | null;
   waist_cm: number | null;
+  neck_cm?: number | null;
+  shoulders_cm?: number | null;
+  chest_cm?: number | null;
+  arm_cm?: number | null;
+  hips_cm?: number | null;
+  thigh_cm?: number | null;
+  calf_cm?: number | null;
   notes: string;
   created_at: string;
   updated_at: string;
@@ -229,7 +236,7 @@ export async function upsertCheckIn(
   weightKg: number | null,
   notesPlain: string,
   editingId?: string,
-  waistCm: number | null = null,
+  measurements: CheckInMeasurements = {},
 ): Promise<CheckIn> {
   const parsed = new Date(`${date}T12:00:00`);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(parsed.getTime()) ||
@@ -240,13 +247,15 @@ export async function upsertCheckIn(
   const { sealText } = await import("./crypto");
   const notes = await sealText(notesPlain);
   const ts = nowISO();
+  const meas: CheckInMeasurements = {};
+  for (const { key } of MEASUREMENT_FIELDS) meas[key] = measurements[key] ?? null;
   return db.transaction("rw", db.check_ins, db.photos, async () => {
     if (editingId) {
       const row = await db.check_ins.get(editingId);
       if (!row || row.deleted_at) throw new Error("Este registro ya no está disponible. Cierra y vuelve a abrirlo.");
       if (row.date !== date) throw new Error("La fecha no se cambia al editar. Crea otro registro para otro día.");
-      await db.check_ins.update(row.id, { weight_kg: weightKg, waist_cm: waistCm, notes, updated_at: ts });
-      return { ...row, weight_kg: weightKg, waist_cm: waistCm, notes: notesPlain, updated_at: ts };
+      await db.check_ins.update(row.id, { weight_kg: weightKg, ...meas, notes, updated_at: ts });
+      return { ...row, weight_kg: weightKg, ...meas, notes: notesPlain, updated_at: ts };
     }
     const existing = await db.check_ins.get({ active_key: date });
     if (existing) {
@@ -256,7 +265,7 @@ export async function upsertCheckIn(
         : "Ya tienes un registro de ese día. Ábrelo para editarlo o añadir fotos. No se ha cambiado nada.");
     }
     const row: CheckIn = {
-      id: uuid(), date, active_key: date, weight_kg: weightKg, waist_cm: waistCm, notes,
+      id: uuid(), date, active_key: date, weight_kg: weightKg, waist_cm: null, ...meas, notes,
       created_at: ts, updated_at: ts, deleted_at: null,
     };
     // La transaccion serializa altas simultaneas; el indice unico es otra
