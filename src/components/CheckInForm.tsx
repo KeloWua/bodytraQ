@@ -8,6 +8,7 @@ export default function CheckInForm({
   initialDate,
   initialWeightKg,
   initialNotes,
+  initialWaistCm,
   unit,
   onSave,
   onCancel,
@@ -16,8 +17,9 @@ export default function CheckInForm({
   initialDate?: string;
   initialWeightKg?: number | null;
   initialNotes?: string;
+  initialWaistCm?: number | null;
   unit: "kg" | "lb";
-  onSave: (date: string, weightKg: number | null, notes: string) => Promise<void>;
+  onSave: (date: string, weightKg: number | null, notes: string, waistCm: number | null) => Promise<void>;
   onCancel: () => void;
 }) {
   const today = todayISO();
@@ -39,6 +41,8 @@ export default function CheckInForm({
       : "",
   );
   const [notes, setNotes] = useState(initialNotes ?? "");
+  const [waist, setWaist] = useState(initialWaistCm != null ? String(initialWaistCm) : "");
+  const [showMeasures, setShowMeasures] = useState(initialWaistCm != null);
 
   async function submit() {
     if (saving) return;
@@ -48,9 +52,11 @@ export default function CheckInForm({
     if (!initialDate && occupiedDates.includes(date)) { setError("Ya tienes un registro de ese día. Ábrelo para editarlo o añadir fotos."); return; }
     const w = weight.trim() === "" ? null : Number(weight.replace(",", "."));
     if (w !== null && (!Number.isFinite(w) || w <= 0 || w >= 1000)) { setError("Introduce un peso válido."); return; }
+    const wc = waist.trim() === "" ? null : Number(waist.replace(",", "."));
+    if (wc !== null && (!Number.isFinite(wc) || wc <= 0 || wc >= 300)) { setError("Introduce una cintura válida (cm)."); return; }
     setSaving(true);
     try {
-      await onSave(date, w === null ? null : unit === "lb" ? lbToKg(w) : w, notes.trim());
+      await onSave(date, w === null ? null : unit === "lb" ? lbToKg(w) : w, notes.trim(), wc);
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo guardar. Inténtalo de nuevo.");
     } finally { setSaving(false); }
@@ -117,6 +123,31 @@ export default function CheckInForm({
           rows={2}
           className="mb-5 w-full min-h-11 rounded-xl bg-zinc-800/70 px-4 py-3 text-white ring-1 ring-white/10 outline-none focus:ring-lime-400"
         />
+        <button
+          type="button"
+          onClick={() => setShowMeasures((v) => !v)}
+          aria-expanded={showMeasures}
+          className="mb-3 text-sm font-semibold text-zinc-300 underline decoration-zinc-600 underline-offset-4"
+        >
+          {showMeasures ? "Ocultar medidas" : "Añadir medidas (opcional)"}
+        </button>
+        {showMeasures && (
+          <>
+            <label className="mb-1.5 block text-[11px] font-medium tracking-widest text-zinc-500 uppercase">
+              Cintura (cm)
+            </label>
+            <input
+              type="number"
+              inputMode="decimal"
+              step="0.5"
+              min="0"
+              value={waist}
+              onChange={(e) => setWaist(e.target.value)}
+              placeholder="85"
+              className="mb-4 w-full min-h-11 rounded-xl bg-zinc-800/70 px-4 py-3 text-white ring-1 ring-white/10 outline-none focus:ring-lime-400"
+            />
+          </>
+        )}
         {error && <p role="alert" className="mb-3 text-sm text-amber-300">{error}</p>}
         <div className="flex gap-3">
           <button
