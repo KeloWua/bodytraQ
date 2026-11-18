@@ -72,6 +72,15 @@ export default function EvolutionView({
 
   const unit = settings.weight_unit;
 
+  const daysInRange =
+    points.length >= 2
+      ? Math.round((points[points.length - 1].ts - points[0].ts) / 86400000)
+      : 0;
+  const weeklyRate =
+    delta != null && daysInRange >= 7
+      ? Math.round((kgToDisplay(delta, unit) / (daysInRange / 7)) * 10) / 10
+      : null;
+
   return (
     <div className="flex min-h-full flex-col px-4 pt-6 pb-4">
       <h2 className="mb-4 text-xl font-bold tracking-tight">Evolución del peso</h2>
@@ -93,17 +102,23 @@ export default function EvolutionView({
         ))}
       </div>
 
-      {/* Current weight + delta */}
+      {/* Resumen del rango visible: actual + cambio neutro + contexto */}
       {currentWeight != null && (
         <div className="mb-4">
           <p className="text-2xl font-bold">
             {fmtWeight(kgToDisplay(currentWeight, unit), unit)}
           </p>
           {delta != null && (
-            <p className="mt-1 text-sm text-zinc-400">
-              {delta >= 0 ? `+${fmtWeight(kgToDisplay(delta, unit), unit)}` : fmtWeight(kgToDisplay(delta, unit), unit)}{" "}
-              desde el inicio
-            </p>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-1 rounded-full bg-zinc-800 px-3 py-1 text-sm font-semibold text-zinc-200 ring-1 ring-white/10">
+                <span aria-hidden="true">{delta > 0 ? "\u2191" : delta < 0 ? "\u2193" : "\u2192"}</span>
+                {fmtWeight(Math.abs(kgToDisplay(delta, unit)), unit)}
+              </span>
+              <span className="text-sm text-zinc-400">
+                {points.length} registros · {daysInRange} días
+                {weeklyRate != null && ` · ${weeklyRate >= 0 ? "+" : ""}${weeklyRate} ${unit}/sem`}
+              </span>
+            </div>
           )}
         </div>
       )}
