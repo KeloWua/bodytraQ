@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import type { CheckIn, Settings } from "@/lib/db";
 import { IconChart } from "./icons";
-import { MEASUREMENT_FIELDS, spansMultipleYears, type MeasurementKey } from "@/lib/utils";
+import { MEASUREMENT_FIELDS, bmi, spansMultipleYears, type MeasurementKey } from "@/lib/utils";
 
 type RangeKey = "1M" | "3M" | "6M" | "1A" | "Todo";
 type MetricKey = "weight" | MeasurementKey;
@@ -40,11 +40,22 @@ export default function EvolutionView({
     metric === "weight" ? "Peso" : MEASUREMENT_FIELDS.find((f) => f.key === metric)!.label;
   const unitLabel = metric === "weight" ? settings.weight_unit : "cm";
   // Referencia cintura/estatura (NICE 2022, NHS): cintura por debajo de la
-  // mitad de la estatura en adultos con IMC < 35. Personal (usa SU altura),
-  // orientativa y sin umbrales absolutos por etnia; no es un diagnóstico.
+  // mitad de la estatura en adultos con IMC < 35. Personal (usa SU altura y
+  // SU peso para evaluar si aplica), orientativa y sin umbrales absolutos
+  // por etnia; no es un diagnóstico.
+  const latestWeightKg = useMemo(() => {
+    for (let i = checkIns.length - 1; i >= 0; i--) {
+      const w = checkIns[i].weight_kg;
+      if (w != null && w > 0) return w;
+    }
+    return null;
+  }, [checkIns]);
+  const hasHeight = settings.height_cm != null && settings.height_cm > 0;
+  const bmiValue =
+    hasHeight && latestWeightKg != null ? bmi(latestWeightKg, settings.height_cm!) : null;
   const waistRefValue =
-    metric === "waist_cm" && settings.height_cm != null && settings.height_cm > 0
-      ? settings.height_cm / 2
+    metric === "waist_cm" && hasHeight && bmiValue != null && bmiValue < 35
+      ? settings.height_cm! / 2
       : null;
   const refs = waistRefValue != null ? [{ value: waistRefValue, label: "Mitad de tu estatura" }] : [];
 
@@ -158,7 +169,11 @@ export default function EvolutionView({
             </p>
           ) : metric === "waist_cm" ? (
             <p className="mt-2 text-xs text-zinc-500">
-              Añade tu altura en Ajustes para ver la referencia cintura/estatura (orientativa).
+              {!hasHeight
+                ? "Añade tu altura en Ajustes para ver la referencia cintura/estatura (orientativa)."
+                : bmiValue == null
+                  ? "Registra tu peso para evaluar si te aplica la referencia cintura/estatura (orientativa)."
+                  : "La referencia cintura/estatura no aplica con IMC ≥ 35: la gráfica muestra tu evolución."}
             </p>
           ) : metric !== "weight" ? (
             <p className="mt-2 text-xs text-zinc-500">
