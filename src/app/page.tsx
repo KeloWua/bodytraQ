@@ -508,10 +508,10 @@ export default function Page() {
           initialDate={modal.editing?.date}
           initialWeightKg={modal.editing?.weight_kg}
           initialNotes={modal.editing?.notes}
-          initialWaistCm={modal.editing?.waist_cm}
+          initialMeasurements={modal.editing ?? undefined}
           unit={settings.weight_unit}
-          onSave={async (date, weightKg, notes, waistCm) => {
-            const row = await upsertCheckIn(date, weightKg, notes, modal.editing?.id, waistCm);
+          onSave={async (date, weightKg, notes, measurements) => {
+            const row = await upsertCheckIn(date, weightKg, notes, modal.editing?.id, measurements);
             setModal({ kind: "none" });
             await reload();
             const list = await listCheckIns();
