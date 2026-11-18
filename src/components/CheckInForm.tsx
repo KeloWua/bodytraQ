@@ -146,7 +146,11 @@ export default function CheckInForm({
           {showMeasures ? "Ocultar medidas" : "Añadir medidas (opcional)"}
         </button>
         {showMeasures && (
-          <div className="mb-4 grid grid-cols-2 gap-3">
+          <>
+            <p className="mb-3 text-xs text-zinc-500">
+              Para comparar, mide siempre igual: de pie, cinta horizontal sin apretar, a la misma hora del día.
+            </p>
+            <div className="mb-4 grid grid-cols-2 gap-3">
             {MEASUREMENT_FIELDS.map(({ key, label }) => (
               <div key={key}>
                 <label className="mb-1.5 block text-[11px] font-medium tracking-widest text-zinc-500 uppercase">
@@ -163,7 +167,8 @@ export default function CheckInForm({
                 />
               </div>
             ))}
-          </div>
+            </div>
+          </>
         )}
         {error && <p role="alert" className="mb-3 text-sm text-amber-300">{error}</p>}
         <div className="flex gap-3">
