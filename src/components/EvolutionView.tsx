@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import type { CheckIn, Settings } from "@/lib/db";
 import { IconChart } from "./icons";
+import { spansMultipleYears } from "@/lib/utils";
 
 type RangeKey = "1M" | "3M" | "6M" | "1A" | "Todo";
 
@@ -158,10 +159,16 @@ function WeightChart({
     return `${x(p.ts)},${y(v)}`;
   }).join(" ");
 
-  // Format date labels: d MMM (es), UTC timezone
+  // Format date labels: d MMM, con año corto si el rango cruza años.
+  const showYear = spansMultipleYears(points.map((p) => p.date));
   const fmtDate = (ts: number) => {
     const d = new Date(ts);
-    return d.toLocaleDateString("es", { day: "numeric", month: "short", timeZone: "UTC" });
+    return d.toLocaleDateString("es", {
+      day: "numeric",
+      month: "short",
+      ...(showYear ? { year: "2-digit" as const } : {}),
+      timeZone: "UTC",
+    });
   };
 
   const fmtAxis = (v: number) => {
