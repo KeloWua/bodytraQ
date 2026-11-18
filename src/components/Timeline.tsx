@@ -212,11 +212,11 @@ export default function Timeline({
       }}
     >
       <header className="sticky top-0 z-20 border-b border-white/5 bg-zinc-950/70 backdrop-blur-md">
-        <div className="flex items-center justify-between px-4 py-3">
+        <div className="flex flex-wrap items-center justify-between gap-y-2 px-4 py-3">
           <span className="text-base font-bold tracking-tight">
             Body<span className="text-lime-400">TRAQ</span>
           </span>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-1.5">
             <button
               onClick={onEditCheckIn}
               className="flex items-center gap-1.5 rounded-full bg-zinc-900 min-h-11 px-3.5 py-2 text-xs font-medium text-zinc-300 ring-1 ring-white/10 transition active:scale-95"
@@ -238,7 +238,7 @@ export default function Timeline({
             <button
               onClick={onOpenSettings}
               aria-label="Ajustes"
-              className="flex h-11 w-11 items-center justify-center rounded-full bg-zinc-900 text-zinc-300 ring-1 ring-white/10 transition active:scale-95"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-zinc-300 ring-1 ring-white/10 transition active:scale-95"
             >
               <IconGear className="h-4.5 w-4.5" />
             </button>
