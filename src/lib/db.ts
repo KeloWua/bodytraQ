@@ -33,6 +33,7 @@ export interface CheckIn {
   date: string; // YYYY-MM-DD, sin unicidad (active_key la proporciona)
   active_key: string; // para activos = date; para papelera = `${date}#deleted#${id}`
   weight_kg: number | null;
+  waist_cm: number | null;
   notes: string;
   created_at: string;
   updated_at: string;
@@ -228,6 +229,7 @@ export async function upsertCheckIn(
   weightKg: number | null,
   notesPlain: string,
   editingId?: string,
+  waistCm: number | null = null,
 ): Promise<CheckIn> {
   const parsed = new Date(`${date}T12:00:00`);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(parsed.getTime()) ||
@@ -243,8 +245,8 @@ export async function upsertCheckIn(
       const row = await db.check_ins.get(editingId);
       if (!row || row.deleted_at) throw new Error("Este registro ya no está disponible. Cierra y vuelve a abrirlo.");
       if (row.date !== date) throw new Error("La fecha no se cambia al editar. Crea otro registro para otro día.");
-      await db.check_ins.update(row.id, { weight_kg: weightKg, notes, updated_at: ts });
-      return { ...row, weight_kg: weightKg, notes: notesPlain, updated_at: ts };
+      await db.check_ins.update(row.id, { weight_kg: weightKg, waist_cm: waistCm, notes, updated_at: ts });
+      return { ...row, weight_kg: weightKg, waist_cm: waistCm, notes: notesPlain, updated_at: ts };
     }
     const existing = await db.check_ins.get({ active_key: date });
     if (existing) {
@@ -254,7 +256,7 @@ export async function upsertCheckIn(
         : "Ya tienes un registro de ese día. Ábrelo para editarlo o añadir fotos. No se ha cambiado nada.");
     }
     const row: CheckIn = {
-      id: uuid(), date, active_key: date, weight_kg: weightKg, notes,
+      id: uuid(), date, active_key: date, weight_kg: weightKg, waist_cm: waistCm, notes,
       created_at: ts, updated_at: ts, deleted_at: null,
     };
     // La transaccion serializa altas simultaneas; el indice unico es otra
