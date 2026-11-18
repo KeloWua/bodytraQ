@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { CheckIn, Photo, Settings, ViewProfile } from "@/lib/db";
 import { photosOf } from "@/lib/db";
 import { objectUrl } from "@/lib/storage";
-import { bmi, fmtDate, kgToLb } from "@/lib/utils";
+import { bmi, fmtDate, kgToLb, spansMultipleYears } from "@/lib/utils";
 import AlignedPhoto from "./AlignedPhoto";
 import {
   IconCamera,
@@ -246,7 +246,7 @@ export default function Timeline({
         </div>
         <div className="pb-3 text-center">
           {settings.show_date && current && (
-            <div className="text-sm font-semibold">{fmtDate(current.date)}</div>
+            <div className="text-sm font-semibold">{fmtDate(current.date, spansMultipleYears(checkIns.map((c) => c.date)))}</div>
           )}
           <div className="text-xs text-zinc-400 tabular-nums">
             {settings.show_weight && weightLabel()}

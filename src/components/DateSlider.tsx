@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import type { CheckIn } from "@/lib/db";
+import { fmtDate, spansMultipleYears } from "@/lib/utils";
 
 export default function DateSlider({
   checkIns,
@@ -46,17 +47,35 @@ export default function DateSlider({
     [dates, firstTs]
   );
 
-  // Short date: d MMM (es), UTC timezone
+  // Short date: d MMM, con año corto solo cuando hay años distintos.
+  const showYear = useMemo(() => spansMultipleYears(checkIns.map((c) => c.date)), [checkIns]);
   const shortDates = useMemo(() => {
     return dates.map((ts) => {
       const d = new Date(ts);
-      return d.toLocaleDateString("es", { day: "numeric", month: "short", timeZone: "UTC" });
+      return d.toLocaleDateString("es", {
+        day: "numeric",
+        month: "short",
+        ...(showYear ? { year: "2-digit" as const } : {}),
+        timeZone: "UTC",
+      });
     });
-  }, [dates]);
+  }, [dates, showYear]);
+
 
   // Ref for current positions so pointer handlers always read fresh values
   const positionsRef = useRef(positions);
   positionsRef.current = positions;
+
+  // Refs de la tira de fichas: centra la ficha activa al cambiar de punto
+  const stripRef = useRef<HTMLDivElement>(null);
+  const chipRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  useEffect(() => {
+    chipRefs.current[index]?.scrollIntoView({
+      behavior: "smooth",
+      inline: "center",
+      block: "nearest",
+    });
+  }, [index]);
 
   const trackRef = useRef<HTMLDivElement>(null);
   const selectedRef = useRef<number | null>(null);
@@ -138,6 +157,12 @@ export default function DateSlider({
   // Current context label
   const currentDay = total > 0 ? dayLabels[index] : 1;
   const currentDate = total > 0 ? shortDates[index] : "";
+  // Etiqueta contextual del punto activo: Día + fecha completa (con día de
+  // semana), siempre visible bajo el slider.
+  const currentLabel =
+    total > 0
+      ? `Día ${currentDay} · ${fmtDate(checkIns[index].date, showYear)}`
+      : "";
 
   if (total === 0) return null;
 
@@ -180,7 +205,7 @@ export default function DateSlider({
                 className={`rounded-full transition-all ${
                   isActive
                     ? "h-3 w-3 bg-lime-400 ring-2 ring-lime-400/50"
-                    : "h-2 w-2 bg-zinc-500"
+                    : "h-1.5 w-1.5 bg-zinc-500"
                 }`}
               />
             </div>
@@ -188,10 +213,47 @@ export default function DateSlider({
         })}
       </div>
 
-      {/* Context label */}
-      <p className="text-center text-xs text-zinc-400">
-        Día {currentDay} — {currentDate}
-      </p>
+      {/* Tira horizontal de fichas: Día + fecha legible de cada punto.
+          Desplazable con el dedo; la ficha activa se centra sola y al tocar
+          una ficha se selecciona ese registro. */}
+      <div
+        ref={stripRef}
+        className="flex w-full gap-1.5 overflow-x-auto py-0.5"
+        style={{ scrollbarWidth: "none" }}
+      >
+        {checkIns.map((c, i) => (
+          <button
+            key={c.id ?? i}
+            ref={(el) => {
+              chipRefs.current[i] = el;
+            }}
+            type="button"
+            onClick={() => onSelect(i)}
+            className={`flex min-w-[4.25rem] shrink-0 flex-col items-center rounded-lg px-2 py-1 text-center transition-colors ${
+              i === index
+                ? "bg-lime-400"
+                : "bg-zinc-800/60"
+            }`}
+          >
+            <span
+              className={`text-[11px] font-semibold leading-4 ${
+                i === index ? "text-zinc-950" : "text-zinc-300"
+              }`}
+            >
+              Día {dayLabels[i]}
+            </span>
+            <span
+              className={`text-[10px] leading-3.5 ${
+                i === index ? "text-zinc-800" : "text-zinc-500"
+              }`}
+            >
+              {shortDates[i]}
+            </span>
+          </button>
+        ))}
+      </div>
+      {/* Fecha completa (con día de semana) del punto seleccionado */}
+      <p className="text-center text-xs text-zinc-400">{currentLabel}</p>
     </div>
   );
 }
