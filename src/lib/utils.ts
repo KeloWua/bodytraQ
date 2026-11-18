@@ -14,14 +14,21 @@ export function todayISO(): string {
   return `${y}-${m}-${day}`;
 }
 
-export function fmtDate(iso: string): string {
+// Fecha superior del timeline. Cuando hay registros de años diferentes, añade
+// el año corto (26/27/19); si todos comparten año, lo omite para no repetirlo.
+export function fmtDate(iso: string, showShortYear = false): string {
   const [y, m, d] = iso.split("-").map(Number);
   return new Date(y, m - 1, d).toLocaleDateString("es-ES", {
     weekday: "short",
     day: "numeric",
     month: "short",
-    year: "numeric",
+    ...(showShortYear ? { year: "2-digit" as const } : {}),
   });
+}
+
+export function spansMultipleYears(dates: string[]): boolean {
+  const years = new Set(dates.map((iso) => iso.slice(0, 4)));
+  return years.size > 1;
 }
 
 export function kgToLb(kg: number): number {
