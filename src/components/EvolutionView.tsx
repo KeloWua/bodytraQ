@@ -25,12 +25,6 @@ function fmtValue(value: number, unitLabel: string): string {
   return `${rounded} ${unitLabel}`;
 }
 
-// Referencias OMS de cintura para hombres adultos (ejemplo para población
-// caucásica): orientativas, no un diagnóstico ni un ideal estético.
-const WAIST_REFS: { value: number; label: string }[] = [
-  { value: 94, label: "OMS: riesgo aumentado (hombres)" },
-  { value: 102, label: "OMS: riesgo alto (hombres)" },
-];
 
 export default function EvolutionView({
   checkIns,
@@ -45,7 +39,14 @@ export default function EvolutionView({
   const metricLabel =
     metric === "weight" ? "Peso" : MEASUREMENT_FIELDS.find((f) => f.key === metric)!.label;
   const unitLabel = metric === "weight" ? settings.weight_unit : "cm";
-  const refs = metric === "waist_cm" ? WAIST_REFS : [];
+  // Referencia cintura/estatura (NICE 2022, NHS): cintura por debajo de la
+  // mitad de la estatura en adultos con IMC < 35. Personal (usa SU altura),
+  // orientativa y sin umbrales absolutos por etnia; no es un diagnóstico.
+  const waistRefValue =
+    metric === "waist_cm" && settings.height_cm != null && settings.height_cm > 0
+      ? settings.height_cm / 2
+      : null;
+  const refs = waistRefValue != null ? [{ value: waistRefValue, label: "Mitad de tu estatura" }] : [];
 
   const points = useMemo(() => {
     const today = new Date();
@@ -152,8 +153,12 @@ export default function EvolutionView({
           <MetricChart points={points} refs={refs} />
           {refs.length > 0 ? (
             <p className="mt-2 text-xs text-zinc-500">
-              Líneas punteadas: referencias OMS orientativas para hombres adultos. No son un
-              diagnóstico ni un objetivo universal.
+              Línea punteada: referencia orientativa (NICE 2022, adultos con IMC &lt; 35) de
+              mantener la cintura por debajo de la mitad de tu estatura. No es un diagnóstico.
+            </p>
+          ) : metric === "waist_cm" ? (
+            <p className="mt-2 text-xs text-zinc-500">
+              Añade tu altura en Ajustes para ver la referencia cintura/estatura (orientativa).
             </p>
           ) : metric !== "weight" ? (
             <p className="mt-2 text-xs text-zinc-500">
