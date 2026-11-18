@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { CheckIn, Photo, Settings, ViewProfile } from "@/lib/db";
 import { photosOf } from "@/lib/db";
 import { objectUrl } from "@/lib/storage";
-import { bmi, fmtDate, kgToLb, spansMultipleYears } from "@/lib/utils";
+import { bmi, fmtDate, kgToLb, spansMultipleYears , MEASUREMENT_FIELDS} from "@/lib/utils";
 import AlignedPhoto from "./AlignedPhoto";
 import {
   IconCamera,
@@ -249,9 +249,18 @@ export default function Timeline({
             <div className="text-sm font-semibold">{fmtDate(current.date, spansMultipleYears(checkIns.map((c) => c.date)))}</div>
           )}
           <div className="text-xs text-zinc-400 tabular-nums">
-            {settings.show_weight && weightLabel()}
-            {settings.show_weight && settings.show_bmi && weightLabel() && bmiLabel() ? " · " : ""}
-            {settings.show_bmi && bmiLabel()}
+            {[
+              settings.show_weight ? weightLabel() : null,
+              settings.show_bmi ? bmiLabel() : null,
+              ...(settings.show_weight && current
+                ? MEASUREMENT_FIELDS.map((f) => {
+                    const v = current[f.key];
+                    return v != null ? `${f.label} ${v} cm` : null;
+                  })
+                : []),
+            ]
+              .filter(Boolean)
+              .join(" · ")}
           </div>
         </div>
       </header>

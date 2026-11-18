@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { CheckIn, ViewProfile } from "@/lib/db";
 import { photosOf } from "@/lib/db";
+import { spansMultipleYears } from "@/lib/utils";
 import { objectUrl } from "@/lib/storage";
 import AlignedPhoto, { type PhotoTransform } from "./AlignedPhoto";
 import { IconChevronL, IconChevronR, IconX } from "./icons";
@@ -256,6 +257,15 @@ export default function CompareSheet({
 
   const viewName = views.find((v) => v.id === viewId)?.name ?? "";
 
+  // Año corto solo cuando los registros abarcan años distintos.
+  const showYear = spansMultipleYears(availableDates);
+  const fmtSelector = (iso: string) =>
+    new Date(iso + "T12:00:00").toLocaleDateString("es-ES", {
+      day: "2-digit",
+      month: "short",
+      ...(showYear ? { year: "2-digit" as const } : {}),
+    });
+
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-zinc-950">
       {/* Cabecera */}
@@ -301,7 +311,7 @@ export default function CompareSheet({
             <IconChevronL />
           </button>
           <span className="min-w-[90px] text-center text-sm font-medium text-zinc-200 tabular-nums">
-            {dateA ? new Date(dateA + "T12:00:00").toLocaleDateString("es-ES", { day: "2-digit", month: "short" }) : "—"}
+            {dateA ? fmtSelector(dateA) : "—"}
           </span>
           <button
             onClick={() => cycleDate("A", 1)}
@@ -323,7 +333,7 @@ export default function CompareSheet({
             <IconChevronL />
           </button>
           <span className="min-w-[90px] text-center text-sm font-medium text-zinc-200 tabular-nums">
-            {dateB ? new Date(dateB + "T12:00:00").toLocaleDateString("es-ES", { day: "2-digit", month: "short" }) : "—"}
+            {dateB ? fmtSelector(dateB) : "—"}
           </span>
           <button
             onClick={() => cycleDate("B", 1)}
@@ -448,4 +458,3 @@ export default function CompareSheet({
     </div>
   );
 }
-

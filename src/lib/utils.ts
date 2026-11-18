@@ -31,6 +31,20 @@ export function spansMultipleYears(dates: string[]): boolean {
   return years.size > 1;
 }
 
+// Medidas corporales opcionales (cm) registrables en cada check-in.
+export const MEASUREMENT_FIELDS = [
+  { key: "neck_cm", label: "Cuello" },
+  { key: "shoulders_cm", label: "Hombros" },
+  { key: "chest_cm", label: "Pecho" },
+  { key: "arm_cm", label: "Brazo" },
+  { key: "waist_cm", label: "Cintura" },
+  { key: "hips_cm", label: "Cadera" },
+  { key: "thigh_cm", label: "Muslo" },
+  { key: "calf_cm", label: "Pantorrilla" },
+] as const;
+export type MeasurementKey = (typeof MEASUREMENT_FIELDS)[number]["key"];
+export type CheckInMeasurements = Partial<Record<MeasurementKey, number | null>>;
+
 export function kgToLb(kg: number): number {
   return Math.round(kg * 2.20462 * 10) / 10;
 }
