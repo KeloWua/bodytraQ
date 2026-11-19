@@ -67,6 +67,7 @@ export default function Timeline({
     clampCount(settings.photos_per_view, Math.max(1, views.length)),
   );
   const [singleViewId, setSingleViewId] = useState<string | null>(null);
+  const [showMeasures, setShowMeasures] = useState(false);
   const [winStart, setWinStart] = useState(0);
 
   // Si el ajuste cambia en Ajustes, el timeline lo refleja al instante.
@@ -148,6 +149,9 @@ export default function Timeline({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   });
+
+  const filledMeasures =
+    settings.show_weight && current ? MEASUREMENT_FIELDS.filter((f) => current[f.key] != null) : [];
 
   function weightLabel(): string | null {
     if (!current?.weight_kg) return null;
@@ -249,19 +253,39 @@ export default function Timeline({
             <div className="text-sm font-semibold">{fmtDate(current.date, spansMultipleYears(checkIns.map((c) => c.date)))}</div>
           )}
           <div className="text-xs text-zinc-400 tabular-nums">
-            {[
-              settings.show_weight ? weightLabel() : null,
-              settings.show_bmi ? bmiLabel() : null,
-              ...(settings.show_weight && current
-                ? MEASUREMENT_FIELDS.map((f) => {
-                    const v = current[f.key];
-                    return v != null ? `${f.label} ${v} cm` : null;
-                  })
-                : []),
-            ]
+            {[settings.show_weight ? weightLabel() : null, settings.show_bmi ? bmiLabel() : null]
               .filter(Boolean)
               .join(" · ")}
           </div>
+          {filledMeasures.length > 0 && (
+            // Medidas plegadas: solo las rellenadas de ESTE registro. El estado
+            // abierto/cerrado vive aqui (no en el registro), asi que se mantiene
+            // al cambiar de fecha y se pueden comparar. Sin medidas no hay boton.
+            <div className="mt-1.5 px-4">
+              <button
+                onClick={() => setShowMeasures((v) => !v)}
+                aria-expanded={showMeasures}
+                aria-controls="measures-panel"
+                className="mx-auto flex min-h-11 items-center gap-1.5 rounded-full px-3 text-xs font-medium text-lime-400 transition active:scale-95"
+              >
+                {showMeasures ? "Ver menos" : `Ver más · ${filledMeasures.length} medida${filledMeasures.length > 1 ? "s" : ""}`}
+                <IconChevronR className={`h-3.5 w-3.5 transition-transform ${showMeasures ? "-rotate-90" : "rotate-90"}`} />
+              </button>
+              {showMeasures && (
+                <dl
+                  id="measures-panel"
+                  className="mx-auto mb-1 grid max-w-sm grid-cols-2 gap-x-6 gap-y-1.5 rounded-2xl bg-zinc-900 px-4 py-3 text-left ring-1 ring-white/10"
+                >
+                  {filledMeasures.map((f) => (
+                    <div key={f.key} className="flex items-baseline justify-between gap-2">
+                      <dt className="text-xs text-zinc-400">{f.label}</dt>
+                      <dd className="text-sm font-semibold text-zinc-100 tabular-nums">{current![f.key]} cm</dd>
+                    </div>
+                  ))}
+                </dl>
+              )}
+            </div>
+          )}
         </div>
       </header>
 
